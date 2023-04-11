@@ -1,13 +1,13 @@
 #include <Arduino.h>
 
 #include "MultiTask.h"
-#include "FluxReaderCommandProcessor.h"
+#include "CommandProcessor.h"
 
 
 const uint8_t LED_PIN = PC13;
 
 MultiTask tasks;
-FluxReaderCommandProcessor command(Serial,tasks);
+CommandProcessor command(Serial,tasks);
 
 void blinkLed() {
   static bool isLedOn = false;
@@ -21,8 +21,6 @@ void setup() {
   tasks.every(500000,blinkLed);
   command.init();
 }
-
-
 
 void loop() {
   tasks.process();
