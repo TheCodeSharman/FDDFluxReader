@@ -3,11 +3,13 @@
 
 #include "utils/stm32utils.h"
 #include "MultiTask.h"
+#include "ReadSampler.h"
 
 class CommandProcessor {
     private:
         MultiTask& multitask;
         USBSerial& serialDevice;
+        ReadSampler& readSampler;
         std::string command;
 
         bool receive(char inChar);
@@ -18,7 +20,7 @@ class CommandProcessor {
         void unknownCommand() ;
 
     public:
-        CommandProcessor(USBSerial& serialDevice, MultiTask& multitask);
+        CommandProcessor(USBSerial& serialDevice, MultiTask& multitask, ReadSampler& readSampler);
         void init();
 };
 

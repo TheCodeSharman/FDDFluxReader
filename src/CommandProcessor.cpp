@@ -24,10 +24,25 @@ void CommandProcessor::processSerial() {
 void CommandProcessor::processCommand() {
     if ( command.empty() ) {
         // do nothing
-    } else if ( command == "bootloader" )
+    } else if ( command == "bootloader" ) {
         enter_dfu_bootloader();
-    else 
+    } else if ( command == "start_sampling" ) {
+        readSampler.startSampling();
+        serialDevice.println("sampling started.");
+    } else if ( command == "stop_sampling" ) {
+        readSampler.stopSampling();
+        serialDevice.println("sampling stopped.");
+    } else if ( command == "help" ) {
+        serialDevice.println("FDDFluxReader v0.1");
+        serialDevice.println("\navailable commands:");
+        serialDevice.println("\tbootloader");
+        serialDevice.println("\tstart_sampling");
+        serialDevice.println("\tstop_sampling");
+        serialDevice.println("\thelp\n");
+    }
+    else { 
         unknownCommand();
+    }
 
     command.clear();
     ready();
@@ -46,8 +61,8 @@ void CommandProcessor::unknownCommand() {
 }
 
 
-CommandProcessor::CommandProcessor(USBSerial& serialDevice, MultiTask& multitask) 
-    : serialDevice(serialDevice), multitask(multitask) {
+CommandProcessor::CommandProcessor(USBSerial& serialDevice, MultiTask& multitask, ReadSampler& readSampler) 
+    : serialDevice(serialDevice), multitask(multitask), readSampler(readSampler) {
 }
 
 void CommandProcessor::init() {
