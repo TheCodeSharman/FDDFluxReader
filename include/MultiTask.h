@@ -53,29 +53,14 @@ class MultiTask {
 
   public:
 
-    ~MultiTask() {
-      for( CallbackFunction* cb : callbacks ) {
-        delete cb;
-      }
-    }
+    ~MultiTask();
+    
     /* Add a call back function to be called every time the clock ticks over the 
        specified delay in microseconds */
-    CallbackFunction* every(uint32_t delay, std::function<void()> callback) {
-      CallbackFunction* cb = new CallbackFunction(callback, 0, delay);
-      callbacks.push_back(cb);
-      return cb;
-    }
+    CallbackFunction* every(uint32_t delay, std::function<void()> callback);
 
     /* Needs to be called as often as possible */
-    void process() {
-      current = micros();
-      for(CallbackFunction* cb : callbacks ) {
-        if ( cb->nextCall < current && cb->isEnabled() ) {
-          cb->nextCall = current+cb->getPeriod();
-          cb->callback();
-        }
-      }
-    }
+    void process();
 };
 
 
