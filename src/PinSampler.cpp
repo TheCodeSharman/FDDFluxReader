@@ -1,10 +1,10 @@
-#include "ReadSampler.h"
+#include "PinSampler.h"
 
-ReadSampler::ReadSampler(Stream& output, MultiTask& multitask, const uint8_t pin) 
+PinSampler::PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin) 
     : output(output), multitask(multitask), pin(pin) {
 }
 
-void ReadSampler::init() {
+void PinSampler::init() {
     PinName pinname = digitalPinToPinName(pin);
     TIM_TypeDef *instance = (TIM_TypeDef *)pinmap_peripheral(pinname, PinMap_TIM);
     channel = STM_PIN_CHANNEL(pinmap_function(pinname, PinMap_TIM));
@@ -13,17 +13,17 @@ void ReadSampler::init() {
     timer.setMode(channel, TIMER_INPUT_CAPTURE_RISING, pin);
     timer.setPrescaleFactor(1);
     timer.setOverflow(0x10000); 
-    timer.attachInterrupt(channel, std::bind(&ReadSampler::captureInterrupt, *this));
-    timer.attachInterrupt(std::bind(&ReadSampler::rolloverInterrupt, *this));
+    timer.attachInterrupt(channel, std::bind(&PinSampler::captureInterrupt, *this));
+    timer.attachInterrupt(std::bind(&PinSampler::rolloverInterrupt, *this));
 
     lastCapture = 0;
     currentCapture = 0;
 
-    drainCallback = multitask.every(2000,std::bind(&ReadSampler::drainSampleBuffer, *this));
+    drainCallback = multitask.every(2000,std::bind(&PinSampler::drainSampleBuffer, *this));
     drainCallback->stop();
 }
 
-void ReadSampler::drainSampleBuffer() {
+void PinSampler::drainSampleBuffer() {
     // Print out up to 100 samples before yielding...
     int count = 100;
 
@@ -41,23 +41,23 @@ void ReadSampler::drainSampleBuffer() {
     }
 }
 
-void ReadSampler::captureInterrupt() {
+void PinSampler::captureInterrupt() {
     currentCapture = timer.getCaptureCompare(channel);
     samples.push(currentCapture - lastCapture);
     lastCapture = currentCapture;
 }
 
-void ReadSampler::rolloverInterrupt() {
+void PinSampler::rolloverInterrupt() {
     samples.push((uint32_t)0);
 }
 
-void ReadSampler::startSampling() {
+void PinSampler::startSampling() {
     samples.clear();
     timer.resume();
     drainCallback->start();
 }
 
-void ReadSampler::stopSampling() {
+void PinSampler::stopSampling() {
     timer.pause();
     // completely drain the sample buffer
     while( !samples.isEmpty() ){

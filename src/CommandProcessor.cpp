@@ -61,7 +61,7 @@ void CommandProcessor::unknownCommand() {
 }
 
 
-CommandProcessor::CommandProcessor(USBSerial& serialDevice, MultiTask& multitask, ReadSampler& readSampler) 
+CommandProcessor::CommandProcessor(USBSerial& serialDevice, MultiTask& multitask, PinSampler& readSampler) 
     : serialDevice(serialDevice), multitask(multitask), readSampler(readSampler) {
 }
 

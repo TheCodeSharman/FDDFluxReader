@@ -2,13 +2,13 @@
 
 #include "MultiTask.h"
 #include "CommandProcessor.h"
-#include "ReadSampler.h"
+#include "PinSampler.h"
 
 const uint8_t LED_PIN = PC13;
 const uint8_t READ_PIN = PA10;
 
 MultiTask tasks;
-ReadSampler readSampler(Serial,tasks,READ_PIN);
+PinSampler readSampler(Serial,tasks,READ_PIN);
 CommandProcessor command(Serial,tasks,readSampler);
 
 void blinkLed() {
