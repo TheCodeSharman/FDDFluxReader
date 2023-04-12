@@ -10,7 +10,7 @@ void PinSampler::init() {
     channel = STM_PIN_CHANNEL(pinmap_function(pinname, PinMap_TIM));
 
     timer.setup(instance);
-    timer.setMode(channel, TIMER_INPUT_CAPTURE_RISING, pin);
+    timer.setMode(channel, TIMER_INPUT_CAPTURE_RISING, pinname);
     timer.setPrescaleFactor(1);
     timer.setOverflow(0xFFFF); 
     timer.attachInterrupt(channel, std::bind(&PinSampler::captureInterrupt, this));
@@ -19,7 +19,7 @@ void PinSampler::init() {
     lastCapture = 0;
     currentCapture = 0;
 
-    drainCallback = multitask.every(10,std::bind(&PinSampler::drainSampleBuffer, this));
+    drainCallback = multitask.every(0,std::bind(&PinSampler::drainSampleBuffer, this));
     drainCallback->stop();
 }
 
