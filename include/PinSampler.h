@@ -13,9 +13,9 @@ class PinSampler {
         const uint8_t pin;
 
         uint32_t channel;
-        volatile uint32_t lastCapture, currentCapture, interruptCalled;
+        volatile uint32_t lastCapture, currentCapture, rolloverCount;
 
-        RingBuf<uint32_t, 1024> samples;
+        RingBuf<uint32_t, 10000> samples;
         HardwareTimer timer;
 
         MultiTask::CallbackFunction* drainCallback;
@@ -24,14 +24,6 @@ class PinSampler {
         void rolloverInterrupt();
 
         void drainSampleBuffer();
-
-        void dumpTimer() {
-            output.printf("timer stats:\n");
-            output.printf("count: %i\n", timer.getCount());
-            output.printf("captureCount: %i\n", timer.getCaptureCompare(channel));
-            output.printf("interruptCalled: %i\n", interruptCalled);
-            output.printf("isRunning: %i\n", timer.isRunning());
-        }
 
     public:
         PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin);

@@ -9,30 +9,23 @@ void PinSampler::init() {
     TIM_TypeDef *instance = (TIM_TypeDef *)pinmap_peripheral(pinname, PinMap_TIM);
     channel = STM_PIN_CHANNEL(pinmap_function(pinname, PinMap_TIM));
 
-    output.printf("Channel %i \n", channel);
-
     timer.setup(instance);
     timer.setMode(channel, TIMER_INPUT_CAPTURE_RISING, pin);
     timer.setPrescaleFactor(1);
-    timer.setOverflow(0x10000); 
-    timer.attachInterrupt(channel, std::bind(&PinSampler::captureInterrupt, *this));
-    timer.attachInterrupt(std::bind(&PinSampler::rolloverInterrupt, *this));
+    timer.setOverflow(0xFFFF); 
+    timer.attachInterrupt(channel, std::bind(&PinSampler::captureInterrupt, this));
+    timer.attachInterrupt(std::bind(&PinSampler::rolloverInterrupt, this));
 
     lastCapture = 0;
     currentCapture = 0;
 
-    drainCallback = multitask.every(2000,std::bind(&PinSampler::drainSampleBuffer, *this));
+    drainCallback = multitask.every(10,std::bind(&PinSampler::drainSampleBuffer, this));
     drainCallback->stop();
-
-    multitask.every(1000000, std::bind(&PinSampler::dumpTimer, *this));
-    timer.refresh();
-    timer.resume();
 }
 
 void PinSampler::drainSampleBuffer() {
     // Print out up to 100 samples before yielding...
-    int count = 100;
-    //output.print("draining\n");
+    int count = 25;
     // If we're getting this message then we need to increase the buffer size...
     if (samples.isFull() ) {
         output.println("Buffer overflow!\n");
@@ -48,14 +41,14 @@ void PinSampler::drainSampleBuffer() {
 }
 
 void PinSampler::captureInterrupt() {
-    interruptCalled++;
     currentCapture = timer.getCaptureCompare(channel);
-    samples.push(currentCapture - lastCapture);
+    samples.push(0xFFFF*rolloverCount + currentCapture - lastCapture);
     lastCapture = currentCapture;
+    rolloverCount=0;
 }
 
 void PinSampler::rolloverInterrupt() {
-    samples.push((uint32_t)0);
+    rolloverCount++;
 }
 
 void PinSampler::startSampling() {

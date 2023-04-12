@@ -5,7 +5,7 @@
 #include "PinSampler.h"
 
 const uint8_t LED_PIN = PC13;
-const uint8_t READ_PIN = PA4;
+const uint8_t READ_PIN = PA1;
 
 MultiTask tasks;
 PinSampler readSampler(Serial,tasks,READ_PIN);
@@ -23,7 +23,10 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   tasks.every(500000,blinkLed);
   command.init();
-  //readSampler.init();
+
+  pinMode(PA_10,OUTPUT);
+  analogWrite(PA_10,127);
+  readSampler.init();
 }
 
 void loop() {
