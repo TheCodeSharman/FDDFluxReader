@@ -1,0 +1,30 @@
+April 12th 2023
+
+Wired up FDD to breadboard:
+Red is INDEX (pin 8)
+Green is DIR SEL (pin 18)
+Blue is STEP (pin 20)
+White is READ (pin 30)
+Yellow is enable MOTOR ON (pin 16)
+Orange is DRIVE SELECT 1 (pin 12) [FDD jumper selects it as D1]
+Purple is TRACK 0 (pin 26)
+Brown is DENSITY SELECT (pin 2)
+
+Power +12vDC is and +5VDC connected to bench power supply
+
+Note that all ines are open collector and active low (TRUE = 0V, FALSE = 5V)
+Ouputs need pull up resisters I'm using 220ohm which gets a nive square wave on the oscilliscope.
+
+To start disc:
+0. unlatch disc (for some reason if the disc is already in the drive on power on it won't seek track 0 correctly)
+1. turn on +12v then +5V
+2. latch the disc
+3. data should be visible on the read lines and the index lines (!)
+4. plugging unpluging the blue jumper shifts the head (use the green jumper to choose direction) 
+    - oddly sometimes the head will move the oppositie direction?!
+
+Build firmware with bootloader command hoping to avoid the DFU bootloader starting issues.
+Didn't work. Was able to enter bootloader after soldering a jumper onto the board !! Good enough for now - 
+should look into getting a STLINK clone - useful for debugging anyway.
+
+Wrote HardwareTimer based code to read a pin - can we do this with interrupts or do we need DMA?
