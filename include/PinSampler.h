@@ -12,10 +12,12 @@ class PinSampler {
         Stream& output;
         const uint8_t pin;
 
+        double ticksToMicros;
+
         uint32_t channel;
         volatile uint32_t lastCapture, currentCapture, rolloverCount;
 
-        RingBuf<uint32_t, 10000> samples;
+        RingBuf<uint32_t, 500> samples;
         HardwareTimer timer;
 
         MultiTask::CallbackFunction* drainCallback;

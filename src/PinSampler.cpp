@@ -18,24 +18,25 @@ void PinSampler::init() {
 
     lastCapture = 0;
     currentCapture = 0;
+    ticksToMicros = 1000000.0/timer.getTimerClkFreq();
 
-    drainCallback = multitask.every(0,std::bind(&PinSampler::drainSampleBuffer, this));
-    drainCallback->stop();
+    drainCallback = multitask.every(1000,std::bind(&PinSampler::drainSampleBuffer, this), false);
 }
 
 void PinSampler::drainSampleBuffer() {
+    //timer.pause();
     // Print out up to 100 samples before yielding...
-    int count = 25;
+   int count = 100;
     // If we're getting this message then we need to increase the buffer size...
-    if (samples.isFull() ) {
+    /*if (samples.isFull() ) {
         output.println("Buffer overflow!\n");
-    }
+    }*/
 
     // We try to drain the ring buffer before it fills up.
-    while( !samples.isEmpty() && count-- > 0 ) {
+    while( !samples.isEmpty() && count-->0 ) {
         uint32_t sample;
-        if ( samples.pop(sample) ) {
-            output.printf("%i\n", sample);
+        if ( samples.lockedPop(sample) ) {
+            output.printf("%.2fus\n", sample*ticksToMicros);
         }
     }
 }

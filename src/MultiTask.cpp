@@ -6,9 +6,10 @@ MultiTask::~MultiTask() {
     }
 }
 
-MultiTask::CallbackFunction* MultiTask::every(uint32_t delay, std::function<void()> callback) {
-    CallbackFunction* cb = new CallbackFunction(callback, 0, delay);
+MultiTask::CallbackFunction* MultiTask::every(uint32_t delay, std::function<void()> callback, bool startNow) {
+    CallbackFunction* cb = new CallbackFunction(callback, delay);
     callbacks.push_back(cb);
+    if ( startNow ) cb->start();
     return cb;
 }
 

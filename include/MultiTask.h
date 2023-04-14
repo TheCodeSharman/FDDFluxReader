@@ -32,15 +32,20 @@ class MultiTask {
       friend class MultiTask;
 
       private:
-        CallbackFunction( std::function<void()> callback, uint32_t nextCall, uint32_t period )
-          : callback(callback), nextCall(nextCall), period(period)  {}
+        CallbackFunction( std::function<void()> callback, uint32_t period )
+          : callback(callback), period(period)  {
+            nextCall = micros() + period;
+          }
 
         std::function<void()> callback;
         uint32_t nextCall;
         uint32_t period;
-        bool enabled = true;
+        bool enabled = false;
       public:
-        void start() { enabled = true; }
+        void start() { 
+          nextCall = micros() + this->period;
+          enabled = true; 
+        }
         void stop() { enabled = false; }
         bool isEnabled() { return enabled; }
         uint32_t getPeriod() { return period; }
@@ -57,7 +62,7 @@ class MultiTask {
     
     /* Add a call back function to be called every time the clock ticks over the 
        specified delay in microseconds */
-    CallbackFunction* every(uint32_t delay, std::function<void()> callback);
+    CallbackFunction* every(uint32_t delay, std::function<void()> callback, bool startNow = true);
 
     /* Needs to be called as often as possible */
     void process();
