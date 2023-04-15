@@ -15,9 +15,20 @@ class PinSampler {
         double ticksToMicros;
 
         uint32_t channel;
-        volatile uint32_t lastCapture, currentCapture, rolloverCount;
+        volatile int32_t lastCapture, currentCapture, rolloverCount;
 
-        RingBuf<uint32_t, 500> samples;
+        //RingBuf<uint32_t, 500> samples;
+        volatile uint32_t sampleWriteIndex, sampleReadIndex;
+
+        struct sample_data_t {
+            uint32_t sample;
+            uint32_t lastCapture;
+            uint32_t currentCapture;
+            uint32_t rolloverCount;
+        };
+
+        sample_data_t samples[500];
+
         HardwareTimer timer;
 
         MultiTask::CallbackFunction* drainCallback;

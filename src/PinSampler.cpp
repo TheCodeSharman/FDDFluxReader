@@ -14,36 +14,53 @@ void PinSampler::init() {
     timer.setPrescaleFactor(1);
     timer.setOverflow(0xFFFF); 
     timer.attachInterrupt(channel, std::bind(&PinSampler::captureInterrupt, this));
-    timer.attachInterrupt(std::bind(&PinSampler::rolloverInterrupt, this));
+    //timer.attachInterrupt(std::bind(&PinSampler::rolloverInterrupt, this));
+    timer.setInterruptPriority(0,0);
 
     lastCapture = 0;
     currentCapture = 0;
+    sampleWriteIndex = 0;
+    sampleReadIndex = 0;
     ticksToMicros = 1000000.0/timer.getTimerClkFreq();
 
-    drainCallback = multitask.every(1000,std::bind(&PinSampler::drainSampleBuffer, this), false);
+    //drainCallback = multitask.every(1000,std::bind(&PinSampler::drainSampleBuffer, this), false);
 }
 
 void PinSampler::drainSampleBuffer() {
     //timer.pause();
     // Print out up to 100 samples before yielding...
-   int count = 100;
+   
     // If we're getting this message then we need to increase the buffer size...
     /*if (samples.isFull() ) {
         output.println("Buffer overflow!\n");
     }*/
 
     // We try to drain the ring buffer before it fills up.
-    while( !samples.isEmpty() && count-->0 ) {
+    /*while( !samples.isEmpty() && count-->0 ) {
         uint32_t sample;
         if ( samples.lockedPop(sample) ) {
             output.printf("%.2fus\n", sample*ticksToMicros);
         }
+    }*/
+
+    
+    for(int count = 10; count > 0; count--) {
+        sampleReadIndex = (sampleReadIndex+1) % 500;
+        sample_data_t& s = samples[sampleReadIndex];
+        output.printf("sample: %i\n", s.sample);
     }
 }
 
 void PinSampler::captureInterrupt() {
-    currentCapture = timer.getCaptureCompare(channel);
-    samples.push(0xFFFF*rolloverCount + currentCapture - lastCapture);
+    sampleWriteIndex = (sampleWriteIndex+1) % 500;
+    sample_data_t& sample = samples[sampleWriteIndex];
+    if ( currentCapture > lastCapture)
+        sample.sample = currentCapture - lastCapture;
+    else
+        sample.sample = 65535 + (currentCapture - lastCapture);
+    sample.lastCapture = lastCapture;
+    sample.rolloverCount = rolloverCount;
+    sample.currentCapture = currentCapture;
     lastCapture = currentCapture;
     rolloverCount=0;
 }
@@ -53,7 +70,7 @@ void PinSampler::rolloverInterrupt() {
 }
 
 void PinSampler::startSampling() {
-    samples.clear();
+    //samples.clear();
     timer.resume();
     drainCallback->start();
 }
@@ -61,8 +78,8 @@ void PinSampler::startSampling() {
 void PinSampler::stopSampling() {
     timer.pause();
     // completely drain the sample buffer
-    while( !samples.isEmpty() ){
+   /* while( !samples.isEmpty() ){
         drainSampleBuffer();
-    }
+    }*/
     drainCallback->stop();
 }

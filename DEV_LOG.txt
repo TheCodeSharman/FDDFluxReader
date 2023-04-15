@@ -28,3 +28,32 @@ Didn't work. Was able to enter bootloader after soldering a jumper onto the boar
 should look into getting a STLINK clone - useful for debugging anyway.
 
 Wrote HardwareTimer based code to read a pin - can we do this with interrupts or do we need DMA?
+
+April 15th 2023
+
+Trying to determine how accurate the interrupt based code is - created a PWM with a period of 3us as a tight testSignal
+signal. Bizaire behaviour: the output is really really slow in inconsistent.
+
+Doubled the period to 6us and can get consistent results but often the sampled perioud is 12us instead of 6us.
+
+So tried setting the interrupt priority to 0 in order rule out competing with other interrupts. The result was positive! 
+Getting a lot more 6us (correct) samples occassionally there is a big 500us or more sample??? 
+
+Tried reducing the overhead of the ISR routine - getting more consistent 3us readings but really really slow; 
+I presume the CPU is spending so much time handling interrupts that there is no time to run application code.
+
+then I got one 44738566.01us (WTF) - what is going on.
+
+Changing bck to 6us to see what happens: getting consistent 6.00us reporting but still 
+the occassional way out of range value. Suspect the rollver code isn't behaving how I expected.
+
+Removing the rollver code doesn't seem to do anything. So WTF? The errant value is -64959 so
+it's a rollover event!! 65536 - 64959 = 576 !! so its exactly negative
+
+Removed rollover code in favour of just a conditional check if the last capture is greater
+then the current capture - this works but doesn't handle the case of multiple rollovers 
+between captures. I wonder if the rollover interrupt is occurring midway through the
+capture interrupt.
+
+Trying 3us again to see if the results are any different. Still hanging. Even trying to
+read the input capture seems to hang the CPU - are the interrupts reentering?
