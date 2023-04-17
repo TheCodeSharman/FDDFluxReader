@@ -76,6 +76,7 @@ __attribute__ ((noreturn))
 void enter_dfu_bootloader() {
     
     // Deinitialize the STM32 - resets PLL and disables interrupts
+    __HAL_RCC_DMA1_CLK_DISABLE();
     HAL_RCC_DeInit();
     HAL_DeInit();
     
