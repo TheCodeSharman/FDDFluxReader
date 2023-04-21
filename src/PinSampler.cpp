@@ -212,7 +212,12 @@ void PinSampler::init() {
     __HAL_RCC_DMA1_CLK_ENABLE();
     HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+
+#ifdef USE_HARDWARE_TIMER_LIBRARY
     __HAL_LINKDMA(timer.getHandle(),hdma[TIM_DMA_ID_CC2],hdma);
+#else
+    __HAL_LINKDMA(&htim,hdma[TIM_DMA_ID_CC2],hdma);
+#endif
 
     DMA1_Stream6_hdma = &hdma;
 
