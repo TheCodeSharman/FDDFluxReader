@@ -13,17 +13,18 @@ class PinSampler {
         MultiTask& multitask;
         Stream& output;
         const uint8_t pin;
-
         double ticksToMicros;
 
+        DMA_HandleTypeDef hdma;
         uint32_t channel;
+        uint32_t dmaBuffer[100];
 
-        uint32_t samples[500];
+        RingBuf<uint32_t, 100> samples;
 
         HardwareTimer timer;
-
-
         MultiTask::CallbackFunction* drainCallback;
+
+        static void DMACaptureComplete(DMA_HandleTypeDef *hdma);
 
         void drainSampleBuffer();
 
