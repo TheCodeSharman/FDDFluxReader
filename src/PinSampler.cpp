@@ -100,12 +100,12 @@ void PinSampler::startSampling() {
     auto halChannel = timer.getChannel(channel);
     HAL_StatusTypeDef status;
 
-/*
-    if ((status = HAL_TIM_IC_Start_DMA(halHandle, halChannel, samples, 500)) != HAL_OK)
+#if 0
+    if ((status = HAL_TIM_IC_Start_DMA(halHandle, halChannel, dmaBuffer, 100)) != HAL_OK)
     {
       Error_Handler();
-    } */
-
+    } 
+#else
     TIM_CHANNEL_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
     TIM_CHANNEL_N_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
 
@@ -113,7 +113,7 @@ void PinSampler::startSampling() {
 
     /* Set the DMA capture callbacks */
     halHandle->hdma[TIM_DMA_ID_CC2]->XferCpltCallback = &PinSampler::DMACaptureComplete;
-    //halHandle->hdma[TIM_DMA_ID_CC2]->XferHalfCpltCallback = TIM_DMACaptureHalfCplt;
+    halHandle->hdma[TIM_DMA_ID_CC2]->XferHalfCpltCallback = TIM_DMACaptureHalfCplt;
 
     /* Set the DMA error callback */
     halHandle->hdma[TIM_DMA_ID_CC2]->XferErrorCallback = TIM_DMAError ;
@@ -125,8 +125,30 @@ void PinSampler::startSampling() {
     }
     /* Enable the TIM Capture/Compare 2  DMA request */
     __HAL_TIM_ENABLE_DMA(halHandle, TIM_DMA_CC2);
+    __HAL_TIM_ENABLE(halHandle);
 
+#endif
+
+#if 0
+    delay(100);
+    uint32_t prevSample = 0;
+    for( int i = 0; i<10; i++ ) {
+      uint32_t currentSample = dmaBuffer[i];
+      uint32_t pulseWidth;
+
+      // We need to detect when the counter rolls over and correct for this 
+      // in the caculation.
+      if ( currentSample < prevSample ) {
+        pulseWidth = 0xFFFF + currentSample - prevSample;
+      } else {
+        pulseWidth = currentSample - prevSample;
+      }
+      output.printf("%0.3fms\n", pulseWidth*ticksToMicros);
+      prevSample = currentSample;
+    }
+#else
     drainCallback->start();
+#endif
 }
 
 void PinSampler::stopSampling() {
