@@ -14,18 +14,198 @@ PinSampler::PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin)
     : output(output), multitask(multitask), pin(pin) {
 }
 
+#ifndef USE_HARDWARE_TIMER_LIBRARY
+int PinSampler::getChannel(uint32_t channel)
+{
+  uint32_t return_value;
+
+  switch (channel) {
+    case 1:
+      return_value = TIM_CHANNEL_1;
+      break;
+    case 2:
+      return_value = TIM_CHANNEL_2;
+      break;
+    case 3:
+      return_value = TIM_CHANNEL_3;
+      break;
+    case 4:
+      return_value = TIM_CHANNEL_4;
+      break;
+    default:
+      return_value = -1;
+  }
+  return return_value;
+}
+
+void PinSampler::enableTimerClock(TIM_HandleTypeDef *htim)
+{
+  // Enable TIM clock
+#if defined(TIM1_BASE)
+  if (htim->Instance == TIM1) {
+    __HAL_RCC_TIM1_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM2_BASE)
+  if (htim->Instance == TIM2) {
+    __HAL_RCC_TIM2_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM3_BASE)
+  if (htim->Instance == TIM3) {
+    __HAL_RCC_TIM3_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM4_BASE)
+  if (htim->Instance == TIM4) {
+    __HAL_RCC_TIM4_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM5_BASE)
+  if (htim->Instance == TIM5) {
+    __HAL_RCC_TIM5_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM6_BASE)
+  if (htim->Instance == TIM6) {
+    __HAL_RCC_TIM6_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM7_BASE)
+  if (htim->Instance == TIM7) {
+    __HAL_RCC_TIM7_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM8_BASE)
+  if (htim->Instance == TIM8) {
+    __HAL_RCC_TIM8_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM9_BASE)
+  if (htim->Instance == TIM9) {
+    __HAL_RCC_TIM9_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM10_BASE)
+  if (htim->Instance == TIM10) {
+    __HAL_RCC_TIM10_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM11_BASE)
+  if (htim->Instance == TIM11) {
+    __HAL_RCC_TIM11_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM12_BASE)
+  if (htim->Instance == TIM12) {
+    __HAL_RCC_TIM12_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM13_BASE)
+  if (htim->Instance == TIM13) {
+    __HAL_RCC_TIM13_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM14_BASE)
+  if (htim->Instance == TIM14) {
+    __HAL_RCC_TIM14_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM15_BASE)
+  if (htim->Instance == TIM15) {
+    __HAL_RCC_TIM15_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM16_BASE)
+  if (htim->Instance == TIM16) {
+    __HAL_RCC_TIM16_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM17_BASE)
+  if (htim->Instance == TIM17) {
+    __HAL_RCC_TIM17_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM18_BASE)
+  if (htim->Instance == TIM18) {
+    __HAL_RCC_TIM18_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM19_BASE)
+  if (htim->Instance == TIM19) {
+    __HAL_RCC_TIM19_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM20_BASE)
+  if (htim->Instance == TIM20) {
+    __HAL_RCC_TIM20_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM21_BASE)
+  if (htim->Instance == TIM21) {
+    __HAL_RCC_TIM21_CLK_ENABLE();
+  }
+#endif
+#if defined(TIM22_BASE)
+  if (htim->Instance == TIM22) {
+    __HAL_RCC_TIM22_CLK_ENABLE();
+  }
+#endif
+}
+#endif
+
 void PinSampler::init() {
     PinName pinname = digitalPinToPinName(pin);
     TIM_TypeDef *instance = (TIM_TypeDef *)pinmap_peripheral(pinname, PinMap_TIM);
     channel = STM_PIN_CHANNEL(pinmap_function(pinname, PinMap_TIM));
 
+#ifdef USE_HARDWARE_TIMER_LIBRARY
     timer.setup(instance);
     timer.setMode(channel, TIMER_INPUT_CAPTURE_FALLING, pinname);
     timer.setPrescaleFactor(1);
     timer.setOverflow(0xFFFF); 
+#else
+    htim.Instance = instance;
+    htim.hdma[0] = NULL;
+    htim.hdma[1] = NULL;
+    htim.hdma[2] = NULL;
+    htim.hdma[3] = NULL;
+    htim.hdma[4] = NULL;
+    htim.hdma[5] = NULL;
+    htim.hdma[6] = NULL;
+    htim.Lock = HAL_UNLOCKED;
+    htim.State = HAL_TIM_STATE_RESET;
+    htim.Init.Prescaler = 0;
+    htim.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim.Init.Period = 0xFFFF;
+    htim.Init.RepetitionCounter = 0;
+    htim.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+
+    enableTimerClock(&htim);
+
+    if (HAL_TIM_Base_Init(&htim) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    if (HAL_TIM_IC_Init(&htim) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_FALLING;
+    sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+    sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+    sConfigIC.ICFilter = 0;
+    if (HAL_TIM_IC_ConfigChannel(&htim, &sConfigIC, getChannel(channel)) != HAL_OK)
+    {
+      Error_Handler();
+    }
+#endif
 
 
-    ticksToMicros = 1000000.0/timer.getTimerClkFreq();
+    ticksToMicros = 1000000.0/HAL_RCC_GetHCLKFreq();
 
     /* TIM2 DMA Init */
     /* TIM2_CH2 Init */
@@ -96,12 +276,19 @@ void PinSampler::DMACaptureComplete(DMA_HandleTypeDef *hdma) {
 
 }
 void PinSampler::startSampling() {
-    auto halHandle = timer.getHandle();
-    auto halChannel = timer.getChannel(channel);
-    HAL_StatusTypeDef status;
+  TIM_HandleTypeDef *halHandle;
+  int halChannel;
 
-#if 0
-    if ((status = HAL_TIM_IC_Start_DMA(halHandle, halChannel, dmaBuffer, 100)) != HAL_OK)
+#ifdef USE_HARDWARE_TIMER_LIBRARY
+  halHandle = timer.getHandle();
+  halChannel = timer.getChannel(channel); 
+#else
+  halHandle = &htim;
+  halChannel = getChannel(channel); 
+#endif
+
+#ifndef USE_HARDWARE_TIMER_LIBRARY
+    if (HAL_TIM_IC_Start_DMA(halHandle, halChannel, dmaBuffer, 100) != HAL_OK)
     {
       Error_Handler();
     } 
