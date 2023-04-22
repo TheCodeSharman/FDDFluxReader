@@ -8,6 +8,18 @@ extern "C" {
   {
     HAL_DMA_IRQHandler(DMA1_Stream6_hdma);
   }
+#ifndef USE_HARDWARE_TIMER_LIBRARY
+  void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+  {
+    PinSampler::HALInputCapture(htim);
+  }
+
+  void PinSampler::HALInputCapture(TIM_HandleTypeDef *htim) {
+    // Pointer magic to find the PinSampler instance that this htim pointer is contained in.
+    PinSampler *instance = reinterpret_cast<PinSampler *>((char *)htim - offsetof(PinSampler, htim));
+    instance->DMABufferFull();
+  }
+#endif
 }
 
 PinSampler::PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin) 
@@ -249,21 +261,13 @@ void PinSampler::drainSampleBuffer() {
     }
 }
 
-void PinSampler::DMACaptureComplete(DMA_HandleTypeDef *hdma) {
-  TIM_HandleTypeDef *htim = (TIM_HandleTypeDef *)((DMA_HandleTypeDef *)hdma)->Parent;
-
-  TIM_CHANNEL_STATE_SET(htim, TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
-  TIM_CHANNEL_N_STATE_SET(htim, TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
-
-  // Pointer magic to find the PinSampler instance that this hdam pointer is contained in.
-  PinSampler *instance = reinterpret_cast<PinSampler *>((char *)hdma - offsetof(PinSampler, hdma));
-  
+void PinSampler::DMABufferFull() {
   // Queue the 100 dma buffered samples for processing and in the process
   // convert from counter ticks to the number of ticks since the previous
   // capture.
   uint32_t prevSample  = 0;
   for( int i = 0; i<100; i++ ) {
-    uint32_t currentSample = instance->dmaBuffer[i];
+    uint32_t currentSample = dmaBuffer[i];
     uint32_t pulseWidth;
 
     // We need to detect when the counter rolls over and correct for this 
@@ -273,13 +277,28 @@ void PinSampler::DMACaptureComplete(DMA_HandleTypeDef *hdma) {
     } else {
       pulseWidth = currentSample - prevSample;
     }
-    instance->samples.push(pulseWidth);
+    samples.push(pulseWidth);
     prevSample = currentSample;
   }
+}
+
+#ifdef USE_HARDWARE_TIMER_LIBRARY
+void PinSampler::DMACaptureComplete(DMA_HandleTypeDef *hdma) {
+  TIM_HandleTypeDef *htim = (TIM_HandleTypeDef *)((DMA_HandleTypeDef *)hdma)->Parent;
+
+  TIM_CHANNEL_STATE_SET(htim, TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
+  TIM_CHANNEL_N_STATE_SET(htim, TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
+
+  // Pointer magic to find the PinSampler instance that this hdam pointer is contained in.
+  PinSampler *instance = reinterpret_cast<PinSampler *>((char *)hdma - offsetof(PinSampler, hdma));
+  instance->DMABufferFull();
+  
 
   htim->Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED;
-
 }
+#endif
+
+
 void PinSampler::startSampling() {
   TIM_HandleTypeDef *halHandle;
   int halChannel;

@@ -20,7 +20,8 @@ FIXME:
    This is a bit ugly because we're relying on the HAL internals to 
    remain the same.
 
-   So the other option is to use HAL directly ourselves.
+   So the other option is to use HAL directly ourselves. Note this
+   require defining HAL_TIM_MODULE_ONLY in the build config.
 
    But I haven't got that working yet so hence the switch.
 */
@@ -42,6 +43,7 @@ class PinSampler {
 
 #ifdef USE_HARDWARE_TIMER_LIBRARY
         HardwareTimer timer;
+         static void DMACaptureComplete(DMA_HandleTypeDef *hdma);
 #else
         TIM_HandleTypeDef htim;
         TIM_ClockConfigTypeDef sClockSourceConfig = {0};
@@ -50,15 +52,17 @@ class PinSampler {
 
         int getChannel(uint32_t channel);
         void enableTimerClock(TIM_HandleTypeDef *htim);
+public:
+        static void HALInputCapture(TIM_HandleTypeDef *htim);
+
+private:
 #endif
 
 
 
         MultiTask::CallbackFunction* drainCallback;
-
-        static void DMACaptureComplete(DMA_HandleTypeDef *hdma);
-
         void drainSampleBuffer();
+        void DMABufferFull();
 
 
     public:
