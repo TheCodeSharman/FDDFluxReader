@@ -10,7 +10,7 @@ extern "C" {
   }
 }
 
-PinSampler::PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin) 
+PinSampler::PinSampler(USBSerial& output, MultiTask& multitask, const uint8_t pin) 
     : output(output), multitask(multitask), pin(pin), sampleBufferOverflow(false) {
 }
 
@@ -57,16 +57,20 @@ void PinSampler::init() {
  }
 
 void PinSampler::drainSampleBuffer() {
-  if ( !samples.isEmpty() ) {
+  if ( sampleBufferOverflow ) {
+    output.printf("\nError: Buffer Overflow\n");
+    stopSampling();
+    return;
+  }
+  if ( samples.size() > 24 ) {
     uint32_t sample;
-    if ( sampleBufferOverflow ) {
-      output.printf("\nOVERFLOW\n");
-      sampleBufferOverflow = false;
+   
+    uint8_t outBuffer[24];
+    for( int i = 0; i < 24 && samples.pop(sample); i++) {
+      outBuffer[i] = (sample>>2) & 0xFF;  
     }
-    for( int i = 0; i < 10 && samples.pop(sample); i++) {
-        output.printf("%0.1fms ", sample*ticksToMicros);
-    }
-    output.printf("\n");
+    output.write(reinterpret_cast<const uint8_t*>(outBuffer), sizeof(outBuffer));
+    output.println();
   }
 }
 
@@ -175,6 +179,7 @@ void PinSampler::startSampling() {
 }
 
 void PinSampler::stopSampling() {
+  drainCallback->stop();
   TIM_HandleTypeDef *halHandle = timer.getHandle();
   if (HAL_DMA_Abort(halHandle->hdma[TIM_DMA_ID_CC2]) != HAL_OK) {
     Error_Handler();

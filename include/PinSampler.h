@@ -14,7 +14,7 @@ class PinSampler {
         static void timerDmaCaptureHalfComplete(DMA_HandleTypeDef *hdma);
 
         MultiTask& multitask;
-        Stream& output;
+        USBSerial& output;
         const uint8_t pin;
         double ticksToMicros;
 
@@ -33,7 +33,7 @@ class PinSampler {
 
         // A ring buffer to queue the samples as they procesed by the DMA
         // interrupts. 
-        RingBuf<uint32_t, 100> samples;
+        RingBuf<uint32_t, 1024> samples;
 
         // Overflow flag - set to true if the buffer has filled up and
         // samples are being lost.
@@ -47,7 +47,7 @@ class PinSampler {
         
 
     public:
-        PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin);
+        PinSampler(USBSerial& output, MultiTask& multitask, const uint8_t pin);
         void init();
         void startSampling();
         void stopSampling();
