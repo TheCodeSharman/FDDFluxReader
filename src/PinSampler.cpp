@@ -57,19 +57,40 @@ void PinSampler::init() {
  }
 
 void PinSampler::drainSampleBuffer() {
+  const int NUM_SAMPLES = 24;
+  uint8_t outBuffer[NUM_SAMPLES*4];
+
+  // Check for overflow condition
   if ( sampleBufferOverflow ) {
     output.printf("\nError: Buffer Overflow\n");
     stopSampling();
     return;
   }
-  if ( samples.size() > 24 ) {
+
+  if ( samples.size() > NUM_SAMPLES ) {
     uint32_t sample;
    
-    uint8_t outBuffer[24];
-    for( int i = 0; i < 24 && samples.pop(sample); i++) {
-      outBuffer[i] = (sample>>2) & 0xFF;  
+    // Multi byte decoding:
+    //   0. set c = 0
+    //   1. read byte b, c = c + (b & 7F)
+    //   2. if b&80 == 1, goto 1
+    int p = 0;
+    for( int i = 0; i < NUM_SAMPLES && samples.pop(sample); i++) {
+      sample = sample >> 2; // discard first 2 bits - we don't need the resolution
+
+      // While the sample has more bits keep ading bytes to the output buffer.
+      // These bytes have the most sigificnat bit set to indicate more bytes to 
+      // follow.
+      while(sample > 0x7F) {
+        outBuffer[p++] = 0x80 & (sample & 0x7F); 
+        sample = sample >> 7;
+      }
+
+      // The last byte has most significant bit clear to indicate no more bytes 
+      // to follow.
+      outBuffer[p++] = sample; 
     }
-    output.write(reinterpret_cast<const uint8_t*>(outBuffer), sizeof(outBuffer));
+    output.write(reinterpret_cast<const uint8_t*>(outBuffer), p);
     output.println();
   }
 }
