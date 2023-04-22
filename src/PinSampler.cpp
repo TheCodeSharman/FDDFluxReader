@@ -24,7 +24,8 @@ void PinSampler::init() {
     timer.setPrescaleFactor(1);
     timer.setOverflow(0xFFFF); 
 
-    ticksToMicros = 1000000.0/timer.getTimerClkFreq();
+    //ticksToMicros = 1000000.0/timer.getTimerClkFreq();
+    clockFrequency = timer.getTimerClkFreq()/1000000;
 
     /* TIM2 DMA Init */
     /* TIM2_CH2 Init */
@@ -57,7 +58,7 @@ void PinSampler::init() {
  }
 
 void PinSampler::drainSampleBuffer() {
-  const int NUM_SAMPLES = 24;
+  const int NUM_SAMPLES = 48;
   uint8_t outBuffer[NUM_SAMPLES*4];
   uint8_t base64Buffer[encode_base64_length(NUM_SAMPLES*4)+1];
 
@@ -76,22 +77,32 @@ void PinSampler::drainSampleBuffer() {
     //   1. read byte b, c = c + (b & 7F)
     //   2. if b&80 == 1, goto 1
     int p = 0;
-    for( int i = 0; i < NUM_SAMPLES && samples.pop(sample); i++) {
-      sample = sample >> 2; // discard first 2 bits - we don't need the resolution
+    for( int i = NUM_SAMPLES; i > 0 && samples.pop(sample); i--) {
+      uint32_t sample25ns = ticksTo25ns(sample);
 
-      // While the sample has more bits keep ading bytes to the output buffer.
-      // These bytes have the most sigificnat bit set to indicate more bytes to 
-      // follow.
-      while(sample > 0x7F) {
-        outBuffer[p++] = 0x80 & (sample & 0x7F); 
-        sample = sample >> 7;
+      // Discard pulse too small for the 25ns resolution
+      if ( sample25ns > 0 ) {
+
+        // While the sample has more bits keep ading bytes to the output buffer.
+        // These bytes have the most sigificnat bit set to indicate more bytes to 
+        // follow.
+        while(sample25ns > 0x7F) {
+          outBuffer[p++] = 0x80 & (sample25ns & 0x7F); 
+          sample25ns = sample25ns >> 7;
+        }
+
+        // The last byte has most significant bit clear to indicate no more bytes 
+        // to follow.
+        outBuffer[p++] = sample25ns; 
       }
-
-      // The last byte has most significant bit clear to indicate no more bytes 
-      // to follow.
-      outBuffer[p++] = sample; 
     }
 
+    // Base64 encoding the buffer adds significant overhead but it means
+    // that the UART protocol is ASCII which displays a little easier in
+    // serial monitors. 
+    //
+    // Once we stop using using terminals to send commands for testing
+    // this makes no sense - so will probably remove it.
     size_t encodedSize = encode_base64(outBuffer, p, base64Buffer);
     output.write(base64Buffer, encodedSize);
     output.println();

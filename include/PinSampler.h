@@ -16,7 +16,12 @@ class PinSampler {
         MultiTask& multitask;
         USBSerial& output;
         const uint8_t pin;
-        double ticksToMicros;
+
+        uint32_t clockFrequency;
+        
+        inline uint32_t ticksTo25ns(uint32_t ticks) {
+            return ((ticks*1000)/clockFrequency)/25;
+        }
 
         DMA_HandleTypeDef hdma;
         uint32_t channel;
