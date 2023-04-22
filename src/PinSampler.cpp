@@ -64,12 +64,11 @@ void PinSampler::drainSampleBuffer() {
 }
 
 void PinSampler::processDmaBuffer() {
-  // Queue the 100 dma buffered samples for processing and in the process
+  // Queue the buffered samples for processing and in the process
   // convert from counter ticks to the number of ticks since the previous
   // capture.
   uint32_t prevSample  = 0;
-  for( int i = 0; i<100; i++ ) {
-    uint32_t currentSample = dmaBuffer[i];
+  for( uint32_t currentSample : dmaBuffer ) {
     uint32_t pulseWidth;
 
     // We need to detect when the counter rolls over and correct for this 
