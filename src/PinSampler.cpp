@@ -1,5 +1,5 @@
 #include "PinSampler.h"
-
+#include <base64.hpp>
 
 DMA_HandleTypeDef* DMA1_Stream6_hdma;
 
@@ -59,6 +59,7 @@ void PinSampler::init() {
 void PinSampler::drainSampleBuffer() {
   const int NUM_SAMPLES = 24;
   uint8_t outBuffer[NUM_SAMPLES*4];
+  uint8_t base64Buffer[encode_base64_length(NUM_SAMPLES*4)+1];
 
   // Check for overflow condition
   if ( sampleBufferOverflow ) {
@@ -90,7 +91,9 @@ void PinSampler::drainSampleBuffer() {
       // to follow.
       outBuffer[p++] = sample; 
     }
-    output.write(reinterpret_cast<const uint8_t*>(outBuffer), p);
+
+    size_t encodedSize = encode_base64(outBuffer, p, base64Buffer);
+    output.write(base64Buffer, encodedSize);
     output.println();
   }
 }
