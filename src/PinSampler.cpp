@@ -63,7 +63,7 @@ void PinSampler::drainSampleBuffer() {
     }
 }
 
-void PinSampler::DMABufferFull() {
+void PinSampler::processDmaBuffer() {
   // Queue the 100 dma buffered samples for processing and in the process
   // convert from counter ticks to the number of ticks since the previous
   // capture.
@@ -84,7 +84,7 @@ void PinSampler::DMABufferFull() {
   }
 }
 
-void PinSampler::DMACaptureComplete(DMA_HandleTypeDef *hdma) {
+void PinSampler::timerDmaCaptureComplete(DMA_HandleTypeDef *hdma) {
   TIM_HandleTypeDef *htim = (TIM_HandleTypeDef *)((DMA_HandleTypeDef *)hdma)->Parent;
 
   TIM_CHANNEL_STATE_SET(htim, TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
@@ -92,7 +92,7 @@ void PinSampler::DMACaptureComplete(DMA_HandleTypeDef *hdma) {
 
   // Pointer magic to find the PinSampler instance that this hdam pointer is contained in.
   PinSampler *instance = reinterpret_cast<PinSampler *>((char *)hdma - offsetof(PinSampler, hdma));
-  instance->DMABufferFull();
+  instance->processDmaBuffer();
   
   htim->Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED;
 }
@@ -110,7 +110,7 @@ void PinSampler::startSampling() {
   TIM_CCxChannelCmd(halHandle->Instance, halChannel, TIM_CCx_ENABLE);
 
   /* Set the DMA capture callbacks */
-  halHandle->hdma[TIM_DMA_ID_CC2]->XferCpltCallback = &PinSampler::DMACaptureComplete;
+  halHandle->hdma[TIM_DMA_ID_CC2]->XferCpltCallback = &PinSampler::timerDmaCaptureComplete;
   halHandle->hdma[TIM_DMA_ID_CC2]->XferHalfCpltCallback = TIM_DMACaptureHalfCplt;
 
   /* Set the DMA error callback */

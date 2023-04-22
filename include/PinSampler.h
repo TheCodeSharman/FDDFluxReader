@@ -20,11 +20,11 @@ class PinSampler {
         RingBuf<uint32_t, 100> samples;
 
         HardwareTimer timer;
-        static void DMACaptureComplete(DMA_HandleTypeDef *hdma);
+        static void timerDmaCaptureComplete(DMA_HandleTypeDef *hdma);
 
         MultiTask::CallbackFunction* drainCallback;
         void drainSampleBuffer();
-        void DMABufferFull();
+        void processDmaBuffer();
 
     public:
         PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin);
