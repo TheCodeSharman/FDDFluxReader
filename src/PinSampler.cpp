@@ -42,7 +42,7 @@ void PinSampler::init() {
     hdma.Init.MemInc = DMA_MINC_ENABLE;
     hdma.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
     hdma.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
-    hdma.Init.Mode = DMA_NORMAL;
+    hdma.Init.Mode = DMA_CIRCULAR;
     hdma.Init.Priority = DMA_PRIORITY_LOW;
     hdma.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
     hdma.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
@@ -59,16 +59,33 @@ void PinSampler::init() {
 void PinSampler::drainSampleBuffer() {
     uint32_t sample;
     for( int i = 0; i < 10 && samples.pop(sample); i++) {
-        output.printf("%0.3fms\n", sample*ticksToMicros);
+        output.printf("%0.1fms ", sample*ticksToMicros);
     }
 }
 
-void PinSampler::processDmaBuffer() {
+void PinSampler::processHalfDmaBuffer( PinSampler::BUFFER_HALF half ) {
+
+  // Determine which half of the buffer to queue, this code doesn't
+  // hardcoding the array size... 
+  uint32_t *from, *to;
+  size_t bufferSize = sizeof(dmaBuffer)/sizeof(uint32_t);
+  switch(half) {
+    case BOTTOM:
+      from = &dmaBuffer[0];
+      to = &dmaBuffer[bufferSize/2];
+      break;
+    case TOP:
+      from = &dmaBuffer[bufferSize/2];
+      to = &dmaBuffer[bufferSize];
+      break;
+  }
+
   // Queue the buffered samples for processing and in the process
   // convert from counter ticks to the number of ticks since the previous
   // capture.
-  uint32_t prevSample  = 0;
-  for( uint32_t currentSample : dmaBuffer ) {
+  while(from < to )
+  {
+    uint32_t currentSample = *from++;
     uint32_t pulseWidth;
 
     // We need to detect when the counter rolls over and correct for this 
@@ -83,25 +100,38 @@ void PinSampler::processDmaBuffer() {
   }
 }
 
+
+/* 
+  FIXME: Yep this is broken non standard usuage of offsetof but it 
+  happens to work with this toolchain. So shut up GCC ... of course 
+  fixing the code so the compiler doesn't complain would be preferrable !
+*/
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+PinSampler *PinSampler::getInstanceFromHdma(DMA_HandleTypeDef *hdma) {
+   return reinterpret_cast<PinSampler *>(
+            reinterpret_cast<char *>(hdma) 
+            - offsetof(PinSampler, hdma));
+}
+#pragma GCC diagnostic pop
+
+TIM_HandleTypeDef * PinSampler::getTimerHandleFromHdma(DMA_HandleTypeDef *hdma) {
+  return reinterpret_cast<TIM_HandleTypeDef *>(hdma->Parent);
+}
+
 void PinSampler::timerDmaCaptureComplete(DMA_HandleTypeDef *hdma) {
-  TIM_HandleTypeDef *htim = (TIM_HandleTypeDef *)((DMA_HandleTypeDef *)hdma)->Parent;
+  getInstanceFromHdma(hdma)->processHalfDmaBuffer(TOP);
+  getTimerHandleFromHdma(hdma)->Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED;
+}
 
-  TIM_CHANNEL_STATE_SET(htim, TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
-  TIM_CHANNEL_N_STATE_SET(htim, TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
-
-  // Pointer magic to find the PinSampler instance that this hdam pointer is contained in.
-  PinSampler *instance = reinterpret_cast<PinSampler *>((char *)hdma - offsetof(PinSampler, hdma));
-  instance->processDmaBuffer();
-  
-  htim->Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED;
+void PinSampler::timerDmaCaptureHalfComplete(DMA_HandleTypeDef *hdma) {
+  getInstanceFromHdma(hdma)->processHalfDmaBuffer(BOTTOM);
+  getTimerHandleFromHdma(hdma)->Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED;
 }
 
 void PinSampler::startSampling() {
-  TIM_HandleTypeDef *halHandle;
-  int halChannel;
-
-  halHandle = timer.getHandle();
-  halChannel = timer.getChannel(channel); 
+  TIM_HandleTypeDef *halHandle = timer.getHandle();
+  int halChannel = timer.getChannel(channel); 
 
   TIM_CHANNEL_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
   TIM_CHANNEL_N_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
@@ -110,7 +140,7 @@ void PinSampler::startSampling() {
 
   /* Set the DMA capture callbacks */
   halHandle->hdma[TIM_DMA_ID_CC2]->XferCpltCallback = &PinSampler::timerDmaCaptureComplete;
-  halHandle->hdma[TIM_DMA_ID_CC2]->XferHalfCpltCallback = TIM_DMACaptureHalfCplt;
+  halHandle->hdma[TIM_DMA_ID_CC2]->XferHalfCpltCallback = &PinSampler::timerDmaCaptureHalfComplete;;
 
   /* Set the DMA error callback */
   halHandle->hdma[TIM_DMA_ID_CC2]->XferErrorCallback = TIM_DMAError ;
@@ -122,11 +152,24 @@ void PinSampler::startSampling() {
   }
   /* Enable the TIM Capture/Compare 2  DMA request */
   __HAL_TIM_ENABLE_DMA(halHandle, TIM_DMA_CC2);
+
+  /* Start the counter */
+  prevSample = timer.getCount(); // record the count at start
   __HAL_TIM_ENABLE(halHandle);
 
   drainCallback->start();
 }
 
 void PinSampler::stopSampling() {
-  drainCallback->stop();
+  TIM_HandleTypeDef *halHandle = timer.getHandle();
+  if (HAL_DMA_Abort(halHandle->hdma[TIM_DMA_ID_CC2]) != HAL_OK) {
+    Error_Handler();
+  }
+
+  __HAL_TIM_DISABLE_DMA(timer.getHandle(), TIM_DMA_CC2);
+  __HAL_TIM_DISABLE(timer.getHandle());
+
+  TIM_CHANNEL_STATE_SET(timer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
+  TIM_CHANNEL_N_STATE_SET(timer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
+
 }
