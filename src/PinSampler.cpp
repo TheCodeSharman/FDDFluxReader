@@ -89,7 +89,7 @@ void PinSampler::processHalfDmaBuffer( PinSampler::BUFFER_HALF half ) {
     uint32_t pulseWidth;
 
     // We need to detect when the counter rolls over and correct for this 
-    // in the caculation.
+    // in the calculation.
     if ( currentSample < prevSample ) {
       pulseWidth = 0xFFFF + currentSample - prevSample;
     } else {
