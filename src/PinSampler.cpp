@@ -11,10 +11,16 @@ extern "C" {
 }
 
 PinSampler::PinSampler(USBSerial& output, MultiTask& multitask, const uint8_t pin) 
-    : output(output), multitask(multitask), pin(pin), sampleBufferOverflow(false) {
+    : output(output), multitask(multitask), pin(pin), 
+      sampleBufferOverflow(false), currentState(NOT_INITIALISED) {
 }
 
 void PinSampler::init() {
+
+    // Don't initialise if we already have been
+    if ( currentState != NOT_INITIALISED )
+      return;
+
     PinName pinname = digitalPinToPinName(pin);
     TIM_TypeDef *instance = (TIM_TypeDef *)pinmap_peripheral(pinname, PinMap_TIM);
     channel = STM_PIN_CHANNEL(pinmap_function(pinname, PinMap_TIM));
@@ -55,6 +61,7 @@ void PinSampler::init() {
     }
 
     drainCallback = multitask.every(0, std::bind(&PinSampler::drainSampleBuffer,this), false);
+    currentState = IDLE;
  }
 
 void PinSampler::drainSampleBuffer() {
@@ -181,6 +188,10 @@ void PinSampler::timerDmaCaptureHalfComplete(DMA_HandleTypeDef *hdma) {
 }
 
 void PinSampler::startSampling() {
+  // Don't start sampling if we already are
+  if ( currentState != IDLE )
+      return;
+
   TIM_HandleTypeDef *halHandle = timer.getHandle();
   int halChannel = timer.getChannel(channel); 
 
@@ -211,9 +222,16 @@ void PinSampler::startSampling() {
   __HAL_TIM_ENABLE(halHandle);
 
   drainCallback->start();
+
+  currentState = SAMPLING;
+  output.println("====== sampling started ======");
 }
 
 void PinSampler::stopSampling() {
+  // Don't stop sampling unless we already are
+  if ( currentState != SAMPLING )
+      return;
+
   drainCallback->stop();
   TIM_HandleTypeDef *halHandle = timer.getHandle();
   if (HAL_DMA_Abort(halHandle->hdma[TIM_DMA_ID_CC2]) != HAL_OK) {
@@ -226,4 +244,6 @@ void PinSampler::stopSampling() {
   TIM_CHANNEL_STATE_SET(timer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
   TIM_CHANNEL_N_STATE_SET(timer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
 
+  currentState = IDLE;
+  output.println("====== sampling stopped ======");
 }

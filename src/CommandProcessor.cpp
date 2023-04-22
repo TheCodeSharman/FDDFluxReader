@@ -12,12 +12,32 @@ bool CommandProcessor::receive(char inChar) {
 }   
 
 void CommandProcessor::processSerial() {
+    if ( serialDevice.dtr() && !attached ) {
+        attached = true;
+        delay(10);
+        help();
+        ready();
+    } else if ( !serialDevice.dtr() && attached ) {
+        attached = false;
+    }
+
     while ( serialDevice.available() > 0 ) {
         char inChar = serialDevice.read();
         echo(inChar);
         if ( receive( inChar ) ) {
             processCommand();
         }
+    }
+}
+
+void CommandProcessor::help() {
+    if ( outputAllowed() ) {
+        serialDevice.println("\nFDDFluxReader v0.1");
+        serialDevice.println("\navailable commands:");
+        serialDevice.println("\tbootloader");
+        serialDevice.println("\tstart_sampling");
+        serialDevice.println("\tstop_sampling");
+        serialDevice.println("\thelp\n");
     }
 }
 
@@ -28,17 +48,10 @@ void CommandProcessor::processCommand() {
         enter_dfu_bootloader();
     } else if ( command == "start_sampling" ) {
         readSampler.startSampling();
-        serialDevice.println("sampling started.");
     } else if ( command == "stop_sampling" ) {
         readSampler.stopSampling();
-        serialDevice.println("sampling stopped.");
     } else if ( command == "help" ) {
-        serialDevice.println("FDDFluxReader v0.1");
-        serialDevice.println("\navailable commands:");
-        serialDevice.println("\tbootloader");
-        serialDevice.println("\tstart_sampling");
-        serialDevice.println("\tstop_sampling");
-        serialDevice.println("\thelp\n");
+        help();
     }
     else { 
         unknownCommand();
@@ -49,15 +62,21 @@ void CommandProcessor::processCommand() {
 }
 
 void CommandProcessor::echo(char inChar) {
-    serialDevice.print(inChar);
+    if ( outputAllowed() ) {
+        serialDevice.print(inChar);
+    }
 }
 
 void CommandProcessor::ready() { 
-    serialDevice.print("> "); 
+    if ( outputAllowed() ) {
+        serialDevice.print("> "); 
+    }
 }
 
 void CommandProcessor::unknownCommand() {
-    serialDevice.printf("Unknown command: %s\r\n", command.c_str() );
+    if ( outputAllowed() ) {
+        serialDevice.printf("Unknown command: %s\r\n", command.c_str() );
+    }
 }
 
 

@@ -7,6 +7,13 @@
 #include "MultiTask.h"
 
 class PinSampler {
+    public:
+        enum State {
+            NOT_INITIALISED,
+            SAMPLING,
+            IDLE
+        };
+        
     private:
         static PinSampler *getInstanceFromHdma(DMA_HandleTypeDef *hdma);
         static TIM_HandleTypeDef *getTimerHandleFromHdma(DMA_HandleTypeDef *hdma);
@@ -18,6 +25,8 @@ class PinSampler {
         const uint8_t pin;
 
         uint32_t clockFrequency;
+
+        State currentState;
         
         inline uint32_t ticksTo25ns(uint32_t ticks) {
             return ((ticks*1000)/clockFrequency)/25;
@@ -49,13 +58,12 @@ class PinSampler {
         MultiTask::CallbackFunction* drainCallback;
         void drainSampleBuffer();
 
-        
-
     public:
         PinSampler(USBSerial& output, MultiTask& multitask, const uint8_t pin);
         void init();
         void startSampling();
         void stopSampling();
+        State getState() { return currentState; };
 };
 
 #endif

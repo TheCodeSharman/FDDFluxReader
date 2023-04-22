@@ -11,13 +11,18 @@ class CommandProcessor {
         USBSerial& serialDevice;
         PinSampler& readSampler;
         std::string command;
+        bool attached = false;
+        bool outputAllowed() {
+            return readSampler.getState() != PinSampler::SAMPLING;
+        }
 
         bool receive(char inChar);
         void processSerial();
         void processCommand();
         void echo(char inChar);
         void ready();
-        void unknownCommand() ;
+        void unknownCommand();
+        void help();
 
     public:
         CommandProcessor(USBSerial& serialDevice, MultiTask& multitask, PinSampler& readSampler);
