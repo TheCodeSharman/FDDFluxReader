@@ -28,15 +28,23 @@ class PinSampler {
         // Circular buffer of incoming input capture samples
         uint32_t dmaBuffer[100];
 
+        enum BUFFER_HALF { TOP, BOTTOM };
+        void processHalfDmaBuffer(BUFFER_HALF half);
+
+        // A ring buffer to queue the samples as they procesed by the DMA
+        // interrupts. 
         RingBuf<uint32_t, 100> samples;
+
+        // Overflow flag - set to true if the buffer has filled up and
+        // samples are being lost.
+        volatile bool sampleBufferOverflow;
 
         HardwareTimer timer;
 
         MultiTask::CallbackFunction* drainCallback;
         void drainSampleBuffer();
 
-        enum BUFFER_HALF { TOP, BOTTOM };
-        void processHalfDmaBuffer(BUFFER_HALF half);
+        
 
     public:
         PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin);

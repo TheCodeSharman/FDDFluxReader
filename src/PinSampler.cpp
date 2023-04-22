@@ -11,7 +11,7 @@ extern "C" {
 }
 
 PinSampler::PinSampler(Stream& output, MultiTask& multitask, const uint8_t pin) 
-    : output(output), multitask(multitask), pin(pin) {
+    : output(output), multitask(multitask), pin(pin), sampleBufferOverflow(false) {
 }
 
 void PinSampler::init() {
@@ -57,10 +57,17 @@ void PinSampler::init() {
  }
 
 void PinSampler::drainSampleBuffer() {
+  if ( !samples.isEmpty() ) {
     uint32_t sample;
+    if ( sampleBufferOverflow ) {
+      output.printf("\nOVERFLOW\n");
+      sampleBufferOverflow = false;
+    }
     for( int i = 0; i < 10 && samples.pop(sample); i++) {
         output.printf("%0.1fms ", sample*ticksToMicros);
     }
+    output.printf("\n");
+  }
 }
 
 void PinSampler::processHalfDmaBuffer( PinSampler::BUFFER_HALF half ) {
@@ -95,7 +102,12 @@ void PinSampler::processHalfDmaBuffer( PinSampler::BUFFER_HALF half ) {
     } else {
       pulseWidth = currentSample - prevSample;
     }
-    samples.push(pulseWidth);
+
+    if ( !samples.push(pulseWidth) ) {
+      // We just dropped a sample...
+      sampleBufferOverflow = true;
+    }
+
     prevSample = currentSample;
   }
 }
@@ -155,6 +167,8 @@ void PinSampler::startSampling() {
 
   /* Start the counter */
   prevSample = timer.getCount(); // record the count at start
+  sampleBufferOverflow = false;
+  samples.clear();
   __HAL_TIM_ENABLE(halHandle);
 
   drainCallback->start();
