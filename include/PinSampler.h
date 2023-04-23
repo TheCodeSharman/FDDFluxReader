@@ -10,11 +10,16 @@ class PinSampler {
     public:
         enum State {
             NOT_INITIALISED,
+            WAITING_FOR_INDEX,
             SAMPLING,
+            STOPPING_SAMPLING,
+            ERROR,
             IDLE
         };
         
     private:
+        const int NUMBER_OF_SAMPLES_IN_BATCH = 42;
+
         static PinSampler *getInstanceFromHdma(DMA_HandleTypeDef *hdma);
         static TIM_HandleTypeDef *getTimerHandleFromHdma(DMA_HandleTypeDef *hdma);
         static void timerDmaCaptureComplete(DMA_HandleTypeDef *hdma);
@@ -22,11 +27,11 @@ class PinSampler {
 
         MultiTask& multitask;
         USBSerial& output;
-        const uint8_t pin;
+        const uint32_t readPin, indexPin;
 
         uint32_t clockFrequency;
 
-        State currentState;
+        volatile State currentState;
         
         inline uint32_t ticksTo25ns(uint32_t ticks) {
             return ((ticks*1000)/clockFrequency)/25;
@@ -49,17 +54,15 @@ class PinSampler {
         // interrupts. 
         RingBuf<uint32_t, 1024> samples;
 
-        // Overflow flag - set to true if the buffer has filled up and
-        // samples are being lost.
-        volatile bool sampleBufferOverflow;
-
         HardwareTimer timer;
 
-        MultiTask::CallbackFunction* drainCallback;
-        void drainSampleBuffer();
+        MultiTask::CallbackFunction* processSampleBufferCallback;
+        void processSampleBuffer();
+        void indexHolePassing();
+        void sendOutputBuffer(const int count);
 
     public:
-        PinSampler(USBSerial& output, MultiTask& multitask, const uint8_t pin);
+        PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin);
         void init();
         void startSampling();
         void stopSampling();

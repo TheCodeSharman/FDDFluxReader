@@ -13,7 +13,9 @@ class CommandProcessor {
         std::string command;
         bool attached = false;
         bool outputAllowed() {
-            return readSampler.getState() != PinSampler::SAMPLING;
+            return !(readSampler.getState() == PinSampler::SAMPLING
+                || readSampler.getState() == PinSampler::STOPPING_SAMPLING
+                || readSampler.getState() == PinSampler::WAITING_FOR_INDEX);
         }
 
         bool receive(char inChar);

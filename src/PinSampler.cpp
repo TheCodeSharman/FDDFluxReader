@@ -10,110 +10,132 @@ extern "C" {
   }
 }
 
-PinSampler::PinSampler(USBSerial& output, MultiTask& multitask, const uint8_t pin) 
-    : output(output), multitask(multitask), pin(pin), 
-      sampleBufferOverflow(false), currentState(NOT_INITIALISED) {
+PinSampler::PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin) 
+    : output(output), multitask(multitask), readPin(readPin), indexPin(indexPin),
+      currentState(NOT_INITIALISED) {
 }
 
 void PinSampler::init() {
-
-    // Don't initialise if we already have been
-    if ( currentState != NOT_INITIALISED )
-      return;
-
-    PinName pinname = digitalPinToPinName(pin);
-    TIM_TypeDef *instance = (TIM_TypeDef *)pinmap_peripheral(pinname, PinMap_TIM);
-    channel = STM_PIN_CHANNEL(pinmap_function(pinname, PinMap_TIM));
-
-    timer.setup(instance);
-    timer.setMode(channel, TIMER_INPUT_CAPTURE_FALLING, pinname);
-    timer.setPrescaleFactor(1);
-    timer.setOverflow(0xFFFF); 
-
-    //ticksToMicros = 1000000.0/timer.getTimerClkFreq();
-    clockFrequency = timer.getTimerClkFreq()/1000000;
-
-    /* TIM2 DMA Init */
-    /* TIM2_CH2 Init */
-    __HAL_RCC_DMA1_CLK_ENABLE();
-    HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-    __HAL_LINKDMA(timer.getHandle(),hdma[TIM_DMA_ID_CC2],hdma);
-
-    DMA1_Stream6_hdma = &hdma;
-
-    hdma.Instance = DMA1_Stream6;
-    hdma.Init.Channel = DMA_CHANNEL_3;
-    hdma.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    hdma.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma.Init.MemInc = DMA_MINC_ENABLE;
-    hdma.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
-    hdma.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
-    hdma.Init.Mode = DMA_CIRCULAR;
-    hdma.Init.Priority = DMA_PRIORITY_LOW;
-    hdma.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
-    hdma.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
-    hdma.Init.MemBurst = DMA_MBURST_SINGLE;
-    hdma.Init.PeriphBurst = DMA_PBURST_SINGLE;
-    if (HAL_DMA_Init(&hdma) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    drainCallback = multitask.every(0, std::bind(&PinSampler::drainSampleBuffer,this), false);
-    currentState = IDLE;
- }
-
-void PinSampler::drainSampleBuffer() {
-  const int NUM_SAMPLES = 48;
-  uint8_t outBuffer[NUM_SAMPLES*4];
-  uint8_t base64Buffer[encode_base64_length(NUM_SAMPLES*4)+1];
-
-  // Check for overflow condition
-  if ( sampleBufferOverflow ) {
-    output.printf("\nError: Buffer Overflow\n");
-    stopSampling();
+  // Don't initialise if we already have been
+  if ( currentState != NOT_INITIALISED )
     return;
+
+  // Configure index hole interrupt
+  pinMode(indexPin,INPUT);
+  attachInterrupt(digitalPinToInterrupt(indexPin), std::bind(&PinSampler::indexHolePassing, this), FALLING);
+
+  // Configure read pin
+  PinName pinname = digitalPinToPinName(readPin);
+  TIM_TypeDef *instance = (TIM_TypeDef *)pinmap_peripheral(pinname, PinMap_TIM);
+  channel = STM_PIN_CHANNEL(pinmap_function(pinname, PinMap_TIM));
+
+  timer.setup(instance);
+  timer.setMode(channel, TIMER_INPUT_CAPTURE_FALLING, pinname);
+  timer.setPrescaleFactor(1);
+  timer.setOverflow(0xFFFF); 
+
+  clockFrequency = timer.getTimerClkFreq()/1000000;
+
+  /* TIM2 DMA Init */
+  /* TIM2_CH2 Init */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+  __HAL_LINKDMA(timer.getHandle(),hdma[TIM_DMA_ID_CC2],hdma);
+
+  DMA1_Stream6_hdma = &hdma;
+
+  hdma.Instance = DMA1_Stream6;
+  hdma.Init.Channel = DMA_CHANNEL_3;
+  hdma.Init.Direction = DMA_PERIPH_TO_MEMORY;
+  hdma.Init.PeriphInc = DMA_PINC_DISABLE;
+  hdma.Init.MemInc = DMA_MINC_ENABLE;
+  hdma.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+  hdma.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+  hdma.Init.Mode = DMA_CIRCULAR;
+  hdma.Init.Priority = DMA_PRIORITY_LOW;
+  hdma.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+  hdma.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+  hdma.Init.MemBurst = DMA_MBURST_SINGLE;
+  hdma.Init.PeriphBurst = DMA_PBURST_SINGLE;
+  if (HAL_DMA_Init(&hdma) != HAL_OK)
+  {
+    Error_Handler();
   }
 
-  if ( samples.size() > NUM_SAMPLES ) {
-    uint32_t sample;
+  TIM_HandleTypeDef *halHandle = timer.getHandle();
+  int halChannel = timer.getChannel(channel); 
+
+  TIM_CHANNEL_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
+  TIM_CHANNEL_N_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
+
+  TIM_CCxChannelCmd(halHandle->Instance, halChannel, TIM_CCx_ENABLE);
+
+  /* Set the DMA capture callbacks */
+  halHandle->hdma[TIM_DMA_ID_CC2]->XferCpltCallback = &PinSampler::timerDmaCaptureComplete;
+  halHandle->hdma[TIM_DMA_ID_CC2]->XferHalfCpltCallback = &PinSampler::timerDmaCaptureHalfComplete;;
+
+  /* Set the DMA error callback */
+  halHandle->hdma[TIM_DMA_ID_CC2]->XferErrorCallback = TIM_DMAError;
+
+  processSampleBufferCallback = multitask.every(0, std::bind(&PinSampler::processSampleBuffer,this), false);
+
+  currentState = IDLE;
+ }
+
+void PinSampler::sendOutputBuffer(const int count) {
+  uint8_t outBuffer[count*4];
+  uint8_t base64Buffer[encode_base64_length(count*4)+1];
+  uint32_t sample;
    
-    // Multi byte decoding:
-    //   0. set c = 0
-    //   1. read byte b, c = c + (b & 7F)
-    //   2. if b&80 == 1, goto 1
-    int p = 0;
-    for( int i = NUM_SAMPLES; i > 0 && samples.pop(sample); i--) {
-      uint32_t sample25ns = ticksTo25ns(sample);
+  // Multi byte decoding:
+  //   0. set c = 0
+  //   1. read byte b, c = c + (b & 7F)
+  //   2. if b&80 == 1, goto 1
+  int p = 0;
+  for( int i = count; i > 0 && samples.pop(sample); i--) {
+    uint32_t sample25ns = ticksTo25ns(sample);
 
-      // Discard pulses less than 2.5us - we don't need them
-      if ( sample25ns > 100 ) {
-        sample25ns = sample25ns - 100; // gives lesss than a byte per sample most of the time.
+    // Discard pulses less than 2.5us - we don't need them
+    if ( sample25ns > 100 ) {
+      sample25ns = sample25ns - 100; // gives lesss than a byte per sample most of the time.
 
-        // While the sample has more bits keep ading bytes to the output buffer.
-        // These bytes have the most sigificnat bit set to indicate more bytes to 
-        // follow.
-        while(sample25ns > 0) {
-          uint8_t byte = sample25ns & 0x7F;
-          sample25ns = sample25ns >> 7;
+      // While the sample has more bits keep ading bytes to the output buffer.
+      // These bytes have the most sigificnat bit set to indicate more bytes to 
+      // follow.
+      while(sample25ns > 0) {
+        uint8_t byte = sample25ns & 0x7F;
+        sample25ns = sample25ns >> 7;
 
-          // The last byte has most significant bit clear to indicate no more bytes 
-          // to follow.
-          outBuffer[p++] = (sample25ns > 0 ? 0x80 : 0) | byte; 
-        }
+        // The last byte has most significant bit clear to indicate no more bytes 
+        // to follow.
+        outBuffer[p++] = (sample25ns > 0 ? 0x80 : 0) | byte; 
       }
     }
+  }
 
-    // Base64 encoding the buffer adds significant overhead but it means
-    // that the UART protocol is ASCII which displays a little easier in
-    // serial monitors. 
-    //
-    // Once we stop using using terminals to send commands for testing
-    // this makes no sense - so will probably remove it.
-    size_t encodedSize = encode_base64(outBuffer, p, base64Buffer);
-    output.write(base64Buffer, encodedSize);
-    output.println();
+  // Base64 encoding the buffer adds significant overhead but it means
+  // that the UART protocol is ASCII which displays a little easier in
+  // serial monitors. 
+  //
+  // Once we stop using using terminals to send commands for testing
+  // this makes no sense - so will probably remove it.
+  size_t encodedSize = encode_base64(outBuffer, p, base64Buffer);
+  output.write(base64Buffer, encodedSize);
+  output.println();
+}
+
+void PinSampler::processSampleBuffer() {
+  if ( currentState == ERROR ) {
+    output.printf("\nError: Buffer Overflow\n");
+    stopSampling();
+  } else if ( currentState == STOPPING_SAMPLING ) {
+    stopSampling();
+  } else if ( currentState == SAMPLING ) {
+    // If there are enough samples in the buffer send them
+    if ( samples.size() > NUMBER_OF_SAMPLES_IN_BATCH ) {
+      sendOutputBuffer(NUMBER_OF_SAMPLES_IN_BATCH);
+    }
   }
 }
 
@@ -152,7 +174,7 @@ void PinSampler::processHalfDmaBuffer( PinSampler::BUFFER_HALF half ) {
 
     if ( !samples.push(pulseWidth) ) {
       // We just dropped a sample...
-      sampleBufferOverflow = true;
+      currentState = ERROR;
     }
 
     prevSample = currentSample;
@@ -193,47 +215,47 @@ void PinSampler::startSampling() {
   if ( currentState != IDLE )
       return;
 
-  TIM_HandleTypeDef *halHandle = timer.getHandle();
-  int halChannel = timer.getChannel(channel); 
-
-  TIM_CHANNEL_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
-  TIM_CHANNEL_N_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
-
-  TIM_CCxChannelCmd(halHandle->Instance, halChannel, TIM_CCx_ENABLE);
-
-  /* Set the DMA capture callbacks */
-  halHandle->hdma[TIM_DMA_ID_CC2]->XferCpltCallback = &PinSampler::timerDmaCaptureComplete;
-  halHandle->hdma[TIM_DMA_ID_CC2]->XferHalfCpltCallback = &PinSampler::timerDmaCaptureHalfComplete;;
-
-  /* Set the DMA error callback */
-  halHandle->hdma[TIM_DMA_ID_CC2]->XferErrorCallback = TIM_DMAError ;
-
-  /* Enable the DMA stream */
-  if (HAL_DMA_Start_IT(halHandle->hdma[TIM_DMA_ID_CC2], (uint32_t)&halHandle->Instance->CCR2, (uint32_t) &dmaBuffer, 100) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* Enable the TIM Capture/Compare 2  DMA request */
-  __HAL_TIM_ENABLE_DMA(halHandle, TIM_DMA_CC2);
-
   /* Start the counter */
   prevSample = timer.getCount(); // record the count at start
-  sampleBufferOverflow = false;
   samples.clear();
-  __HAL_TIM_ENABLE(halHandle);
+  
+  processSampleBufferCallback->start();
 
-  drainCallback->start();
-
-  currentState = SAMPLING;
+  currentState = WAITING_FOR_INDEX;
   output.println("====== sampling started ======");
+}
+
+void PinSampler::indexHolePassing() {
+  // If we are sampling we can stop the sampling since we've got the entire track.
+  if (currentState == SAMPLING){
+    currentState = STOPPING_SAMPLING;
+  } 
+  // If we're waiting for the index hole, just enable the timer, this starts
+  // the DMA based circular buffer.
+  else if (currentState == WAITING_FOR_INDEX) {
+    currentState = SAMPLING;
+    /* Enable the DMA stream */
+    TIM_HandleTypeDef *halHandle = timer.getHandle();
+    if (HAL_DMA_Start_IT(halHandle->hdma[TIM_DMA_ID_CC2], (uint32_t)&halHandle->Instance->CCR2, (uint32_t) &dmaBuffer, 100) != HAL_OK)
+    {
+      Error_Handler();
+    }
+    /* Enable the TIM Capture/Compare 2  DMA request */
+    __HAL_TIM_ENABLE_DMA(halHandle, TIM_DMA_CC2);
+    __HAL_TIM_ENABLE(halHandle);
+  }
+
 }
 
 void PinSampler::stopSampling() {
   // Don't stop sampling unless we already are
-  if ( currentState != SAMPLING )
+  if ( ! (currentState == SAMPLING 
+          || currentState == WAITING_FOR_INDEX 
+          || currentState == STOPPING_SAMPLING 
+          || currentState == ERROR ) )
       return;
 
-  drainCallback->stop();
+  processSampleBufferCallback->stop();
   TIM_HandleTypeDef *halHandle = timer.getHandle();
   if (HAL_DMA_Abort(halHandle->hdma[TIM_DMA_ID_CC2]) != HAL_OK) {
     Error_Handler();
@@ -245,6 +267,9 @@ void PinSampler::stopSampling() {
   TIM_CHANNEL_STATE_SET(timer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
   TIM_CHANNEL_N_STATE_SET(timer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
 
+  while(!samples.isEmpty()) {
+    sendOutputBuffer(NUMBER_OF_SAMPLES_IN_BATCH);
+  }
   currentState = IDLE;
   output.println("====== sampling stopped ======");
 }
