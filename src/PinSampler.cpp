@@ -87,20 +87,21 @@ void PinSampler::drainSampleBuffer() {
     for( int i = NUM_SAMPLES; i > 0 && samples.pop(sample); i--) {
       uint32_t sample25ns = ticksTo25ns(sample);
 
-      // Discard pulse too small for the 25ns resolution
-      if ( sample25ns > 0 ) {
+      // Discard pulses less than 2.5us - we don't need them
+      if ( sample25ns > 100 ) {
+        sample25ns = sample25ns - 100; // gives lesss than a byte per sample most of the time.
 
         // While the sample has more bits keep ading bytes to the output buffer.
         // These bytes have the most sigificnat bit set to indicate more bytes to 
         // follow.
-        while(sample25ns > 0x7F) {
-          outBuffer[p++] = 0x80 & (sample25ns & 0x7F); 
+        while(sample25ns > 0) {
+          uint8_t byte = sample25ns & 0x7F;
           sample25ns = sample25ns >> 7;
-        }
 
-        // The last byte has most significant bit clear to indicate no more bytes 
-        // to follow.
-        outBuffer[p++] = sample25ns; 
+          // The last byte has most significant bit clear to indicate no more bytes 
+          // to follow.
+          outBuffer[p++] = (sample25ns > 0 ? 0x80 : 0) | byte; 
+        }
       }
     }
 
