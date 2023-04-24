@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 from base64 import standard_b64decode
-from enum import Flag
+from enum import Flag, Enum
 from binascii import crc32
 from dataclasses import dataclass
+from struct import pack
+from typing import List
 
 start_sampling = '====== sampling started ======'
 end_sampling = '====== sampling stopped ======'
-
-
 
 class ScpFlag(Flag):
     INDEX      = 0x1  # is set if the data is syncronised to index hole
@@ -17,78 +17,79 @@ class ScpFlag(Flag):
     WRITE      = 0x10 # MODE flag; set is read/write
     FOOTER     = 0x20 # is set there is footer
 
+class ScpHeads(Enum):
+    BOTH   = 0
+    BOTTOM = 1 # side 0
+    TOP    = 2 # side 1
+
 @dataclass
 class ScpHeader:
-    def __init__(self, 
-            disk_type = 0x8000,    # disk type ( man_Other, disk_360 )
-            revolutions = 1, 
-            start_track = 1, 
-            end_track = 80, 
-            flags = 0,
-            bitcell_width = 0,
-            heads = 0,             # 0 = both, 1 = side 0 (bottom), 2 = side 1 (top)
-            resolution = 0        # 0 = 25ns, otherwise 25ns + n*25ns
-        ):
-        self.version = 0x19
-        self.disktype = disk_type
-        self.revolutions = revolutions
-        self.starttrack = start_track
-        self.endtrack = end_track
-        self.flags = flags,
-        self.bitcell_width = bitcell_width
-        self.heads = heads
-        self.resolution = resolution
+    version: int = 0x19
+    disk_type: int = 0x80
+    revolutions: int = 1
+    start_track: int = 1
+    end_track: int = 80
+    flags: ScpFlag = 0
+    bitcell_width: int = 0
+    heads: ScpHeads = ScpHeads.BOTH
+    resolution: int = 0
     
-    def write(self, buffer):
-        buffer.write("SCP")
-        buffer.write(bytes(
-            [
-                self.version, 
-                self.disk_type, 
-                self.revolutions, 
-                self.start_track, 
-                self.end_track, 
-                self.flags,
-                self.bitcell_width,
-                self.heads,
-                self.resolution
-            ]))
+    def pack(self):
+        return pack("3s9B", b'SCP', self.version,  self.disk_type, self.revolutions, 
+            self.start_track, self.end_track, self.flags.value,
+            self.bitcell_width, self.heads.value, self.resolution)
 
+@dataclass
 class ScpRevolution:
-    def __init__(self, index_time_ns, bitcell_data):
-        self.index_time = index_time_ns/25
-        self.bitcell_length = len(bitcell_data)
-        self.bitcell_data = bitcell_data
+    index_time_ns: int 
+    bitcell_data: List[int]
 
-class ScpTrackHeader:
-    def __init__(self, number):
-        self.number = number
-        self.revolutions = []
-        pass
+    def pack_header(self, offset):
+        return pack("3I", self.index_time_ns//25, len(self.bitcell_data), offset)
+    
+    def pack_bitcell_data(self):
+        return pack('>%iH' % len(self.bitcell_data), *self.bitcell_data)
 
-    def add_revolution(self, revolution):
-        self.revolutions.append(revolution)
+@dataclass
+class ScpTrack:
+    revolutions: List[ScpRevolution]
+    track_number: int = 0
+    
+    def pack(self):
+        bytes = pack('3sB', b'TRK', self.track_number)
+        offset = 4 + len(self.revolutions)*12
+        for revolution in self.revolutions:
+            bytes += revolution.pack_header(offset)
+            offset += len(revolution.bitcell_data)*2
+        for revolution in self.revolutions:
+            bytes += revolution.pack_bitcell_data()
+        return bytes
 
-    def write(self,buffer):
-        buffer.write('TRK')
-        buffer.write(bytes([self.number]))
-        buffer.write
-
-
+@dataclass
 class ScpFile:
-    def __init__(self, header = ScpHeader()):
-        self.header = header
-        self.tracks = []
+    header: ScpHeader
+    tracks: List[ScpTrack]
 
-    def add_track(self, track):
-        self.tracks.append(track)
+    def pack(self):
+        track_offsets = bytes()
+        all_track_data = bytes()
+        num_tracks = self.header.end_track - self.header.start_track + 1
+        
+        if num_tracks != len(self.tracks):
+            raise Exception("Expecting %i tracks but got %i" % (num_tracks, len(self.tracks)))
+        
+        offset = num_tracks*4
 
-    def write(self,buffer):
-        self.header.write(buffer)
-        # write 4 bytes of checksum
-        # write track header
-        # write track data
+        for track in self.tracks:
+            track_offsets += pack('<I',offset)
+            track_data = track.pack()
+            all_track_data += track_data
+            offset += len(track_data)
 
+        header = self.header.pack()
+        tracks_and_offsets = track_offsets + all_track_data
+        track_crc32 = pack('<I', crc32(tracks_and_offsets))
+        return b''.join([header, track_crc32, tracks_and_offsets])
 
 class PinSampleDecoder: 
     def __init__(self):
@@ -124,7 +125,24 @@ with open('platformio-device-monitor-230423-160853.log', 'r') as file:
         decoder.processbuffer(standard_b64decode(line))
         line = file.readline()
         
-decoder.dump()
+# Construct an SCP file from the decoded track
+with open('track.scp', 'wb') as scp_file:
+    scp_file.write(ScpFile(
+        header = ScpHeader( 
+            start_track = 1,
+            end_track = 1,
+            flags = ScpFlag.INDEX | ScpFlag.RPM_360 | ScpFlag.TPI_96
+            ), 
+        tracks = [
+            ScpTrack(
+                track_number = 1,
+                revolutions = [ ScpRevolution( 
+                        index_time_ns = 166*1000*1000,
+                        bitcell_data = decoder.samples
+                    )
+                ]
+            )
+        ]).pack())
 
 
 
