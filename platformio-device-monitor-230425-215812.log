@@ -1,0 +1,20 @@
+
+FDDFluxReader v0.1
+
+available commands:
+	bootloader
+	start_sampling
+	stop_sampling
+	help
+
+> start_sampling
+====== sampling started ======
+75, 97, 102, 97, 36, 32, 100, 97, 102, 97, 36, 33, 100, 98, 103, 97, 35, 34, 99, 100, 102, 98, 35, 33, 100, 100, 100, 100, 35, 34, 100, 99, 102, 99, 35, 33, 100, 99, 101, 100, 35, 33, 
+S2FmYSQgZGFmYSQhZGJnYSMiY2RmYiMhZGRkZCMiZGNmYyMhZGNlZCMh
+
+Error: Buffer Overflow
+99, 101, 102, 98, 35, 34, 99, 100, 3021, 37, 158, 43, 160, 38, 30, 37, 160, 41, 160, 40, 30, 37, 161, 41, 162, 38, 30, 37, 160, 42, 160, 40, 30, 36, 159, 42, 162, 37, 31, 39, 158, 41, 
+Y2VmYiMiY2TNFyWeASugASYeJaABKaABKB4loQEpogEmHiWgASqgASgeJJ8BKqIBJR8nngEp
+162, 39, 31, 37, 9674, 40, 30, 37, 160, 42, 160, 38, 29, 38, 159, 41, 162, 37, 30, 37, 162, 39, 163, 39, 28, 36, 161, 42, 161, 37, 31, 37, 159, 42, 159, 39, 31, 37, 158, 43, 159, 39, 
+ogEnHyXKSygeJaABKqABJh0mnwEpogElHiWiASejASccJKEBKqEBJR8lnwEqnwEnHyWeASufASc=
+32, 37, 157, 42, 159, 40, 30, 37, 161, 40, 162, 38, 29, 38, 160, 41, 161, 39, 29, 38, 161, 41, 160, 40, 16642, 100, 100, 102, 37, 32, 99, 101, 102, 100, 35, 34, 101, 9591, 34, 33, 98, 100, 

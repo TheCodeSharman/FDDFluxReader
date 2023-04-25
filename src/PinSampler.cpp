@@ -109,6 +109,7 @@ void PinSampler::sendOutputBuffer(const int count) {
     // Discard pulses less than 2.5us - we don't need them
     if ( sample25ns > 100 ) {
       sample25ns = sample25ns - 100; // gives lesss than a byte per sample most of the time.
+      output.printf("%i, ", sample25ns);
 
       // While the sample has more bits keep ading bytes to the output buffer.
       // These bytes have the most sigificnat bit set to indicate more bytes to 
@@ -131,6 +132,7 @@ void PinSampler::sendOutputBuffer(const int count) {
   // Once we stop using using terminals to send commands for testing
   // this makes no sense - so will probably remove it.
   size_t encodedSize = encode_base64(outBuffer, p, base64Buffer);
+  output.println();
   output.write(base64Buffer, encodedSize);
   output.println();
 }

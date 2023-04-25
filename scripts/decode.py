@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from struct import pack
 from typing import List
 
-start_sampling = '====== sampling started ======'
-end_sampling = '====== sampling stopped ======'
+start_sampling = '====== sampling started'
+end_sampling = '====== sampling stopped'
 
 class ScpFlag(Flag):
     INDEX      = 0x1  # is set if the data is syncronised to index hole
@@ -125,7 +125,7 @@ class PinSampleDecoder:
             print(sample*25/1000, '\xB5s')
 
 decoder = PinSampleDecoder()
-with open('platformio-device-monitor-230423-160853.log', 'r') as file:
+with open('platformio-device-monitor-230425-212731.log', 'r') as file:
     line = ""
     while not line.startswith(start_sampling):
         line = file.readline()

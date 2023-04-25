@@ -1,0 +1,10 @@
+
+FDDFluxReader v0.1
+
+available commands:
+	bootloader
+	start_sampling
+	stop_sampling
+	help
+
+> 

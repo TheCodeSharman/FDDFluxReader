@@ -1,0 +1,18 @@
+
+FDDFluxReader v0.1
+
+available commands:
+	bootloader
+	start_sampling
+	stop_sampling
+	help
+
+> start_sampling
+====== sampling started ======
+VmFnYCQgZGJmYiMhZGJnYSMiY2NmYiMhZGNkZCIiZGNkZCMiZGNlZCMi
+
+Error: Buffer Overflow
+Y2RlYiMiY2SkPyOgASqhASgfJKABKqABKRwkogEpoQEnHiShASqfASceJqABKqIBJx4kogEo
+ogEoHyWgASqfASgeJaEBKqABKB8loAEqnwEpHiWhASqfASkeJaEBKqEBJR8lrUsnICSfASqhASc=
+HyWeASqhASgeJKABKaIBJx4loQEpoQEoHSShASuhASenqwEloAEpnwEmHiShASmgASUeJZ8BKaABJQ==
+HiShASifASYdJaABKKIBJR0loAEpnwElHiWfASqgASUeJaEB
