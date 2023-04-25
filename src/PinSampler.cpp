@@ -179,6 +179,8 @@ void PinSampler::processHalfDmaBuffer( PinSampler::BUFFER_HALF half ) {
 
     prevSample = currentSample;
   }
+
+  checkForOverflow();
 }
 
 
@@ -198,6 +200,30 @@ PinSampler *PinSampler::getInstanceFromHdma(DMA_HandleTypeDef *hdma) {
 
 TIM_HandleTypeDef * PinSampler::getTimerHandleFromHdma(DMA_HandleTypeDef *hdma) {
   return reinterpret_cast<TIM_HandleTypeDef *>(hdma->Parent);
+}
+
+void PinSampler::checkForOverflow() {
+    uint32_t tmpisr;
+
+    typedef struct
+    {
+      __IO uint32_t ISR;   /*!< DMA interrupt status register */
+      __IO uint32_t Reserved0;
+      __IO uint32_t IFCR;  /*!< DMA interrupt flag clear register */
+    } DMA_Base_Registers;
+ 
+    /* calculate DMA base and stream number */
+    DMA_Base_Registers *regs = (DMA_Base_Registers *)hdma.StreamBaseAddress;
+
+    tmpisr = regs->ISR;
+
+    if ( (tmpisr & (DMA_FLAG_TCIF0_4 << hdma.StreamIndex)) != RESET
+        || (tmpisr & (DMA_FLAG_HTIF0_4 << hdma.StreamIndex)) != RESET
+    ) {
+      // We just dropped a sample...
+      currentState = ERROR;
+    }
+ 
 }
 
 void PinSampler::timerDmaCaptureComplete(DMA_HandleTypeDef *hdma) {

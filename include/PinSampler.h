@@ -24,7 +24,7 @@ class PinSampler {
         static TIM_HandleTypeDef *getTimerHandleFromHdma(DMA_HandleTypeDef *hdma);
         static void timerDmaCaptureComplete(DMA_HandleTypeDef *hdma);
         static void timerDmaCaptureHalfComplete(DMA_HandleTypeDef *hdma);
-
+        
         MultiTask& multitask;
         USBSerial& output;
         const uint32_t readPin, indexPin;
@@ -60,6 +60,7 @@ class PinSampler {
         void processSampleBuffer();
         void indexHolePassing();
         void sendOutputBuffer(const int count);
+        void checkForOverflow();
 
     public:
         PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin);
