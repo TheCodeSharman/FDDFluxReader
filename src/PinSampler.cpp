@@ -1,5 +1,6 @@
 #include "PinSampler.h"
 #include <base64.hpp>
+#include "utils/buffer.h"
 
 DMA_HandleTypeDef* DMA1_Stream6_hdma;
 
@@ -94,46 +95,18 @@ void PinSampler::init() {
  }
 
 void PinSampler::sendOutputBuffer(const int count) {
-  uint8_t outBuffer[count*4];
-  uint8_t base64Buffer[encode_base64_length(count*4)+1];
+  uint32_t sampleBuffer[count];
+  uint8_t outBuffer[encode_base64_length(count*4)+1];
   uint32_t sample;
-   
-  // Multi byte decoding:
-  //   0. set c = 0
-  //   1. read byte b, c = c + (b & 7F)
-  //   2. if b&80 == 1, goto 1
-  int p = 0;
-  for( int i = count; i > 0 && samples.pop(sample); i--) {
-    uint32_t sample25ns = ticksTo25ns(sample);
 
-    // Discard pulses less than 2.5us - we don't need them
-    if ( sample25ns > 100 ) {
-      sample25ns = sample25ns - 100; // gives lesss than a byte per sample most of the time.
-      output.printf("%i, ", sample25ns);
-
-      // While the sample has more bits keep ading bytes to the output buffer.
-      // These bytes have the most sigificnat bit set to indicate more bytes to 
-      // follow.
-      while(sample25ns > 0) {
-        uint8_t byte = sample25ns & 0x7F;
-        sample25ns = sample25ns >> 7;
-
-        // The last byte has most significant bit clear to indicate no more bytes 
-        // to follow.
-        outBuffer[p++] = (sample25ns > 0 ? 0x80 : 0) | byte; 
-      }
-    }
+  for( int i = 0; i < count && samples.pop(sample); i++) {
+    samples[i] = ticksTo25ns(sample);
   }
 
-  // Base64 encoding the buffer adds significant overhead but it means
-  // that the UART protocol is ASCII which displays a little easier in
-  // serial monitors. 
-  //
-  // Once we stop using using terminals to send commands for testing
-  // this makes no sense - so will probably remove it.
-  size_t encodedSize = encode_base64(outBuffer, p, base64Buffer);
+  int encodedSize = encodeSampleBuffer(count, outBuffer, sampleBuffer);
+
   output.println();
-  output.write(base64Buffer, encodedSize);
+  output.write(outBuffer, encodedSize);
   output.println();
 }
 
