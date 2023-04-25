@@ -32,13 +32,17 @@ class PinSampler {
         uint32_t clockFrequency;
 
         volatile State currentState;
+        volatile uint32_t indexStart;
+        volatile uint32_t indexStop;
+        volatile uint32_t indexPeriod;
         
         inline uint32_t ticksTo25ns(uint32_t ticks) {
             return ((ticks*1000)/clockFrequency)/25;
         }
 
         DMA_HandleTypeDef hdma;
-        uint32_t channel;
+        uint32_t samplerChannel;
+        uint32_t indexChannel;
 
         // Last counter value processed, this is kept so that when the circular buffer
         // is overwritten we know the previous highest sample.
@@ -54,7 +58,8 @@ class PinSampler {
         // interrupts. 
         RingBuf<uint32_t, 1024> samples;
 
-        HardwareTimer timer;
+        HardwareTimer samplerTimer;
+        HardwareTimer indexTimer;
 
         MultiTask::CallbackFunction* processSampleBufferCallback;
         void processSampleBuffer();

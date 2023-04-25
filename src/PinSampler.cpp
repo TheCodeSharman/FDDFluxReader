@@ -23,25 +23,35 @@ void PinSampler::init() {
   // Configure index hole interrupt
   pinMode(indexPin,INPUT);
   attachInterrupt(digitalPinToInterrupt(indexPin), std::bind(&PinSampler::indexHolePassing, this), FALLING);
+  // PinName indexPinname = digitalPinToPinName(indexPin);
+  // TIM_TypeDef *indexInstance = (TIM_TypeDef *)pinmap_peripheral(indexPinname, PinMap_TIM);
+  // uint32_t indexChannel = STM_PIN_CHANNEL(pinmap_function(indexPinname, PinMap_TIM));
+
+  // indexTimer.setup(indexInstance);
+  // indexTimer.setMode(indexChannel, TIMER_INPUT_CAPTURE_FALLING, indexPinname);
+  // indexTimer.setPrescaleFactor(8);
+  // indexTimer.setOverflow(0xFFFF); 
+  // indexTimer.attachInterrupt(indexChannel,std::bind(&PinSampler::indexHolePassing, this));
+  // indexTimer.resume();
 
   // Configure read pin
-  PinName pinname = digitalPinToPinName(readPin);
-  TIM_TypeDef *instance = (TIM_TypeDef *)pinmap_peripheral(pinname, PinMap_TIM);
-  channel = STM_PIN_CHANNEL(pinmap_function(pinname, PinMap_TIM));
+  PinName readPinname = digitalPinToPinName(readPin);
+  TIM_TypeDef *readTimerInstance = (TIM_TypeDef *)pinmap_peripheral(readPinname, PinMap_TIM);
+  samplerChannel = STM_PIN_CHANNEL(pinmap_function(readPinname, PinMap_TIM));
 
-  timer.setup(instance);
-  timer.setMode(channel, TIMER_INPUT_CAPTURE_FALLING, pinname);
-  timer.setPrescaleFactor(1);
-  timer.setOverflow(0xFFFF); 
+  samplerTimer.setup(readTimerInstance);
+  samplerTimer.setMode(samplerChannel, TIMER_INPUT_CAPTURE_FALLING, readPinname);
+  samplerTimer.setPrescaleFactor(1);
+  samplerTimer.setOverflow(0xFFFF); 
 
-  clockFrequency = timer.getTimerClkFreq()/1000000;
+  clockFrequency = samplerTimer.getTimerClkFreq()/1000000;
 
   /* TIM2 DMA Init */
   /* TIM2_CH2 Init */
   __HAL_RCC_DMA1_CLK_ENABLE();
   HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-  __HAL_LINKDMA(timer.getHandle(),hdma[TIM_DMA_ID_CC2],hdma);
+  __HAL_LINKDMA(samplerTimer.getHandle(),hdma[TIM_DMA_ID_CC2],hdma);
 
   DMA1_Stream6_hdma = &hdma;
 
@@ -63,8 +73,8 @@ void PinSampler::init() {
     Error_Handler();
   }
 
-  TIM_HandleTypeDef *halHandle = timer.getHandle();
-  int halChannel = timer.getChannel(channel); 
+  TIM_HandleTypeDef *halHandle = samplerTimer.getHandle();
+  int halChannel = samplerTimer.getChannel(samplerChannel); 
 
   TIM_CHANNEL_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
   TIM_CHANNEL_N_STATE_SET(halHandle, halChannel, HAL_TIM_CHANNEL_STATE_BUSY);
@@ -242,7 +252,7 @@ void PinSampler::startSampling() {
       return;
 
   /* Start the counter */
-  prevSample = timer.getCount(); // record the count at start
+  prevSample = samplerTimer.getCount(); // record the count at start
   samples.clear();
   
   processSampleBufferCallback->start();
@@ -254,14 +264,20 @@ void PinSampler::startSampling() {
 void PinSampler::indexHolePassing() {
   // If we are sampling we can stop the sampling since we've got the entire track.
   if (currentState == SAMPLING){
+    //indexStop = indexTimer.getCaptureCompare(indexChannel);
+    //indexPeriod = indexStop - indexStart; 
+    if ( indexPeriod < 0 )
+      indexPeriod += 0xffff;
+
     currentState = STOPPING_SAMPLING;
   } 
   // If we're waiting for the index hole, just enable the timer, this starts
   // the DMA based circular buffer.
   else if (currentState == WAITING_FOR_INDEX) {
+    //indexStart = indexTimer.getCaptureCompare(indexChannel);
     currentState = SAMPLING;
     /* Enable the DMA stream */
-    TIM_HandleTypeDef *halHandle = timer.getHandle();
+    TIM_HandleTypeDef *halHandle = samplerTimer.getHandle();
     if (HAL_DMA_Start_IT(halHandle->hdma[TIM_DMA_ID_CC2], (uint32_t)&halHandle->Instance->CCR2, (uint32_t) &dmaBuffer, 100) != HAL_OK)
     {
       Error_Handler();
@@ -282,20 +298,22 @@ void PinSampler::stopSampling() {
       return;
 
   processSampleBufferCallback->stop();
-  TIM_HandleTypeDef *halHandle = timer.getHandle();
+  TIM_HandleTypeDef *halHandle = samplerTimer.getHandle();
   if (HAL_DMA_Abort(halHandle->hdma[TIM_DMA_ID_CC2]) != HAL_OK) {
     Error_Handler();
   }
 
-  __HAL_TIM_DISABLE_DMA(timer.getHandle(), TIM_DMA_CC2);
-  __HAL_TIM_DISABLE(timer.getHandle());
+  __HAL_TIM_DISABLE_DMA(samplerTimer.getHandle(), TIM_DMA_CC2);
+  __HAL_TIM_DISABLE(samplerTimer.getHandle());
 
-  TIM_CHANNEL_STATE_SET(timer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
-  TIM_CHANNEL_N_STATE_SET(timer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
+  TIM_CHANNEL_STATE_SET(samplerTimer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
+  TIM_CHANNEL_N_STATE_SET(samplerTimer.getHandle(), TIM_CHANNEL_2, HAL_TIM_CHANNEL_STATE_READY);
 
   while(!samples.isEmpty()) {
     sendOutputBuffer(NUMBER_OF_SAMPLES_IN_BATCH);
   }
   currentState = IDLE;
-  output.println("====== sampling stopped ======");
+  double indexTimeMs = indexPeriod * indexTimer.getPrescaleFactor() / clockFrequency; 
+
+  output.printf("====== sampling stopped (index time %0.3fms) ======\n", indexTimeMs);
 }

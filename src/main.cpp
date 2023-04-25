@@ -6,7 +6,7 @@
 
 const uint32_t LED_PIN = PC13;
 const uint32_t READ_PIN = PA1;
-const uint32_t INDEX_PIN = PA0;
+const uint32_t INDEX_PIN = PB0;
 
 MultiTask tasks;
 PinSampler readSampler(Serial,tasks,READ_PIN,INDEX_PIN);
