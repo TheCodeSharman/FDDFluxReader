@@ -45,7 +45,7 @@ class ScpRevolution:
     bitcell_data: List[int]
 
     def pack_header(self, offset):
-        return pack("3I", self.index_time_ns//25, len(self.bitcell_data), offset)
+        return pack('<3I', self.index_time_ns//25, len(self.bitcell_data), offset)
     
     def pack_bitcell_data(self):
         return pack('>%iH' % len(self.bitcell_data), *self.bitcell_data)
@@ -56,7 +56,7 @@ class ScpTrack:
     track_number: int = 0
     
     def pack(self):
-        bytes = pack('3sB', b'TRK', self.track_number)
+        bytes = pack('<3sB', b'TRK', self.track_number)
         offset = 4 + len(self.revolutions)*12
         for revolution in self.revolutions:
             bytes += revolution.pack_header(offset)
@@ -70,6 +70,11 @@ class ScpFile:
     header: ScpHeader
     tracks: List[ScpTrack]
 
+    def __post_init__(self):
+        self.track_table= [None] * 168
+        for track in self.tracks:
+            self.track_table[track.track_number] = track
+
     def pack(self):
         track_offsets = bytes()
         all_track_data = bytes()
@@ -78,15 +83,20 @@ class ScpFile:
         if num_tracks != len(self.tracks):
             raise Exception("Expecting %i tracks but got %i" % (num_tracks, len(self.tracks)))
         
-        offset = num_tracks*4
-
-        for track in self.tracks:
-            track_offsets += pack('<I',offset)
-            track_data = track.pack()
-            all_track_data += track_data
-            offset += len(track_data)
-
         header = self.header.pack()
+
+        offset = len(header) + 4 + len(self.track_table)*4
+
+        for track in self.track_table:
+            if track is None:
+                track_offsets += pack('<I', 0)
+            else:
+                track_offsets += pack('<I',offset)
+                track_data = track.pack()
+                all_track_data += track_data
+                offset += len(track_data)
+
+        
         tracks_and_offsets = track_offsets + all_track_data
         track_crc32 = pack('<I', crc32(tracks_and_offsets))
         return b''.join([header, track_crc32, tracks_and_offsets])
@@ -129,23 +139,18 @@ with open('platformio-device-monitor-230423-160853.log', 'r') as file:
 with open('track.scp', 'wb') as scp_file:
     scp_file.write(ScpFile(
         header = ScpHeader( 
-            start_track = 1,
-            end_track = 1,
+            start_track = 0,
+            end_track = 0,
+            heads = ScpHeads.BOTTOM,
             flags = ScpFlag.INDEX | ScpFlag.RPM_360 | ScpFlag.TPI_96
             ), 
         tracks = [
             ScpTrack(
-                track_number = 1,
+                track_number = 0,
                 revolutions = [ ScpRevolution( 
-                        index_time_ns = 166*1000*1000,
+                        index_time_ns = 1667*100*1000,
                         bitcell_data = decoder.samples
                     )
                 ]
             )
         ]).pack())
-
-
-
-
-
-
