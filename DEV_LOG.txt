@@ -57,3 +57,27 @@ capture interrupt.
 
 Trying 3us again to see if the results are any different. Still hanging. Even trying to
 read the input capture seems to hang the CPU - are the interrupts reentering?
+
+Apr 26 
+Fixed the python decoding script and can now successfully load the track into 
+HxcFloppyEmulator software. One minor issue though: the track index hole isn't 
+perfectly aligned with the read sample data.
+
+Presumably this is because `PinSampler::indexHolePassing` takes some time to
+execute and thus the hole isn't lined up properly. Also when we stop sampling 
+similarly there is a delay whilst more samples are buffered.
+
+Possible ways to fix this:
+  1. Do nothing. It seems to be working OK. HxcFloppyEmulator does incorrectly 
+     think that the bit rate is variable.
+
+  2. Try to fix this in software by doing as much of the timer setup before
+     the index hole interrupt is fired. Ideally just set a register bit to
+     enable/disable the read sampler. Less effort.
+
+  3. Do it in hardware: setup a timer trigger on the index pulse to start
+     and then stop the timer as the index hole passes. More complex but
+     supre precise.
+
+I think I'll try option 2 first. Would be good to use a Hardware Timer for the index
+hole though so we can measure the actual RPM of the drive.
