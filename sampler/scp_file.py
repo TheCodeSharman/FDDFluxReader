@@ -1,13 +1,8 @@
-#!/usr/bin/env python3
-from base64 import standard_b64decode
-from enum import Flag, Enum
-from binascii import crc32
 from dataclasses import dataclass
 from struct import pack
 from typing import List
-
-start_sampling = '====== sampling started'
-end_sampling = '====== sampling stopped'
+from enum import Flag, Enum
+from binascii import crc32
 
 class ScpFlag(Flag):
     INDEX      = 0x1  # is set if the data is syncronised to index hole
@@ -100,57 +95,3 @@ class ScpFile:
         tracks_and_offsets = track_offsets + all_track_data
         track_crc32 = pack('<I', crc32(tracks_and_offsets))
         return b''.join([header, track_crc32, tracks_and_offsets])
-
-class PinSampleDecoder: 
-    def __init__(self):
-        self.samples = []
-
-    def processbuffer(self, buffer):
-        ptr = 0
-        while ptr < len(buffer):
-            ptr = self.decodesample(buffer, ptr)
-
-    def decodesample(self, buffer, ptr):
-        sample = 100
-        byte = 0x80 
-        while byte & 0x80: 
-            byte = buffer[ptr]
-            sample += (byte & 0x7f)
-            ptr += 1
-        self.samples.append(sample)
-        return ptr
-
-    def dump(self):
-        for sample in self.samples:
-            print(sample*25/1000, '\xB5s')
-
-decoder = PinSampleDecoder()
-with open('platformio-device-monitor-230425-212731.log', 'r') as file:
-    line = ""
-    while not line.startswith(start_sampling):
-        line = file.readline()
-    
-    line = file.readline()
-    while not line.startswith(end_sampling):
-        decoder.processbuffer(standard_b64decode(line))
-        line = file.readline()
-        
-# Construct an SCP file from the decoded track
-with open('track.scp', 'wb') as scp_file:
-    scp_file.write(ScpFile(
-        header = ScpHeader( 
-            start_track = 0,
-            end_track = 0,
-            heads = ScpHeads.BOTTOM,
-            flags = ScpFlag.INDEX | ScpFlag.RPM_360 | ScpFlag.TPI_96
-            ), 
-        tracks = [
-            ScpTrack(
-                track_number = 0,
-                revolutions = [ ScpRevolution( 
-                        index_time_ns = 1667*100*1000,
-                        bitcell_data = decoder.samples
-                    )
-                ]
-            )
-        ]).pack())
