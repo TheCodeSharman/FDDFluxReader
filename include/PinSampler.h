@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include <RingBuf.h>
 
+
+#include <BufferEncoder.h>
 #include "MultiTask.h"
 
 class PinSampler {
@@ -18,6 +20,7 @@ class PinSampler {
         };
         
     private:
+        BufferEncoder bufferEncoder;
         const int NUMBER_OF_SAMPLES_IN_BATCH = 42;
 
         static PinSampler *getInstanceFromHdma(DMA_HandleTypeDef *hdma);

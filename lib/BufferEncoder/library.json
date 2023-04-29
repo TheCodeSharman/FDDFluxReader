@@ -1,0 +1,11 @@
+{
+    "name": "BufferEncoder",
+    "version": "0.0.1",
+    "description": "Compresses a array of uint32_t into a smaller array",
+    "keywords": "bytes, encoding",
+    "dependencies": {
+        "densaugeo/base64": "~1.4.0"
+    },
+    "frameworks": "*",
+    "platforms": "*"
+  }

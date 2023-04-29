@@ -1,6 +1,4 @@
 #include "PinSampler.h"
-#include <base64.hpp>
-#include "utils/buffer.h"
 
 DMA_HandleTypeDef* DMA1_Stream6_hdma;
 
@@ -96,15 +94,15 @@ void PinSampler::init() {
 
 void PinSampler::sendOutputBuffer(const int count) {
   uint32_t sampleBuffer[count];
-  uint8_t outBuffer[encode_base64_length(count*4)+1];
+  uint8_t outBuffer[bufferEncoder.maxBufferLength(count)];
   uint32_t sample;
-  
+
   int bufferIndex;
   for( bufferIndex = 0; bufferIndex < count && samples.pop(sample); bufferIndex++) {
     sampleBuffer[bufferIndex] = ticksTo25ns(sample);
   }
 
-  int encodedSize = encodeSampleBuffer(bufferIndex+1, outBuffer, sampleBuffer);
+  int encodedSize = bufferEncoder.encodeSampleBuffer(bufferIndex+1, outBuffer, sampleBuffer);
 
   output.println();
   output.write(outBuffer, encodedSize);

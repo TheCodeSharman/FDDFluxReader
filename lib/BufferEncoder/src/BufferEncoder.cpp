@@ -1,9 +1,11 @@
-#ifndef BUFFER_H
-#define BUFFER_H
-
+#include "BufferEncoder.h"
 #include <base64.hpp>
 
-int decodeSampleBuffer( const int inputBufferSize, const uint8_t *base64Buffer, uint32_t *samples ) {
+size_t BufferEncoder::maxBufferLength( const size_t count) {
+    return (size_t) encode_base64_length(count*5)+1;
+}
+
+int BufferEncoder::decodeSampleBuffer( const size_t inputBufferSize, const uint8_t *base64Buffer, uint32_t *samples ) {
     uint8_t outBuffer[decode_base64_length(base64Buffer, inputBufferSize)+1];
 
     int decodedSize = decode_base64(base64Buffer, inputBufferSize, outBuffer);
@@ -25,9 +27,10 @@ int decodeSampleBuffer( const int inputBufferSize, const uint8_t *base64Buffer, 
     return i;
 }
 
-int encodeSampleBuffer( int count, uint8_t *base64Buffer, uint32_t *samples)
+int BufferEncoder::encodeSampleBuffer( const size_t count, uint8_t *base64Buffer, const uint32_t *samples)
 {
-    uint8_t outBuffer[count*4];
+    // There is a maximum of 5 bytes per word
+    uint8_t outBuffer[count*5];
 
     // Multi byte decoding:
     //   0. set c = 0
@@ -63,5 +66,3 @@ int encodeSampleBuffer( int count, uint8_t *base64Buffer, uint32_t *samples)
     // this makes no sense - so will probably remove it.
     return encode_base64(outBuffer, p, base64Buffer);
 }
-
-#endif
