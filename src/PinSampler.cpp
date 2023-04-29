@@ -98,12 +98,13 @@ void PinSampler::sendOutputBuffer(const int count) {
   uint32_t sampleBuffer[count];
   uint8_t outBuffer[encode_base64_length(count*4)+1];
   uint32_t sample;
-
-  for( int i = 0; i < count && samples.pop(sample); i++) {
-    samples[i] = ticksTo25ns(sample);
+  
+  int bufferIndex;
+  for( bufferIndex = 0; bufferIndex < count && samples.pop(sample); bufferIndex++) {
+    sampleBuffer[bufferIndex] = ticksTo25ns(sample);
   }
 
-  int encodedSize = encodeSampleBuffer(count, outBuffer, sampleBuffer);
+  int encodedSize = encodeSampleBuffer(bufferIndex+1, outBuffer, sampleBuffer);
 
   output.println();
   output.write(outBuffer, encodedSize);
