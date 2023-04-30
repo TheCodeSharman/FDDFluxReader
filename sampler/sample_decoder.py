@@ -19,7 +19,10 @@ class SampleDecoder:
             sample += (byte & 0x7f) << shift
             shift += 7
             ptr += 1
-        self.samples.append(sample)
+        if ( sample > 65535 ):
+            self.samples.append(65535)
+        else:
+            self.samples.append(sample)
         return ptr
 
     def dump(self):

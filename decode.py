@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 from sampler.scp_file import ScpFile, ScpFlag, ScpHeader, ScpHeads, ScpRevolution, ScpTrack
 from sampler.sample_decoder import SampleDecoder
+import sys
 
 start_sampling = '====== sampling started'
 end_sampling = '====== sampling stopped'
 
+if ( len(sys.argv) != 2):
+    print("Syntax: decode.py <filename>")
+    exit()
+
+ascii_file = sys.argv[1]
+
 decoder = SampleDecoder()
-with open('platformio-device-monitor-230425-212731.log', 'r') as file:
+with open(ascii_file, 'r') as file:
     line = ""
     while not line.startswith(start_sampling):
         line = file.readline()

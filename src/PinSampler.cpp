@@ -9,8 +9,8 @@ extern "C" {
   }
 }
 
-PinSampler::PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin) 
-    : output(output), multitask(multitask), readPin(readPin), indexPin(indexPin),
+PinSampler::PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin, const uint32_t stepPin, const uint32_t dirPin) 
+    : output(output), multitask(multitask), readPin(readPin), indexPin(indexPin), stepPin(stepPin), dirPin(dirPin),
       currentState(NOT_INITIALISED) {
 }
 
@@ -18,6 +18,12 @@ void PinSampler::init() {
   // Don't initialise if we already have been
   if ( currentState != NOT_INITIALISED )
     return;
+
+  // Configure step and dir pins
+  pinMode(dirPin, OUTPUT);
+  digitalWrite(dirPin, HIGH);
+  pinMode(stepPin, OUTPUT);
+  digitalWrite(stepPin, LOW);
 
   // Configure index hole interrupt
   pinMode(indexPin,INPUT);
@@ -103,8 +109,6 @@ void PinSampler::sendOutputBuffer(const int count) {
   }
 
   int encodedSize = bufferEncoder.encodeSampleBuffer(bufferIndex+1, outBuffer, sampleBuffer);
-
-  output.println();
   output.write(outBuffer, encodedSize);
   output.println();
 }

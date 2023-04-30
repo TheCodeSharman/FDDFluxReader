@@ -81,3 +81,12 @@ Possible ways to fix this:
 
 I think I'll try option 2 first. Would be good to use a Hardware Timer for the index
 hole though so we can measure the actual RPM of the drive.
+
+30 Apr
+Tried to wire up the STEP and DIR pins to the microcontroller but there seems to be
+an interference pattern from the READ pin intering with ALL other GPIO pins.
+
+Not sure what to do about that - maybe use a filter to filter out the interfence.
+
+Oddly if I detach the wires BLUE and GREEN from the micro the interference stops.
+Maybe cross talk between the wires in the cable I'm using?

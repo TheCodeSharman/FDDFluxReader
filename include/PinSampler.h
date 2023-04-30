@@ -30,7 +30,7 @@ class PinSampler {
         
         MultiTask& multitask;
         USBSerial& output;
-        const uint32_t readPin, indexPin;
+        const uint32_t readPin, indexPin, stepPin, dirPin;
 
         uint32_t clockFrequency;
 
@@ -71,7 +71,7 @@ class PinSampler {
         void checkForOverflow();
 
     public:
-        PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin);
+        PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin, const uint32_t stepPin, const uint32_t dirPin);
         void init();
         void startSampling();
         void stopSampling();
