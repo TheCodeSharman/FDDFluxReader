@@ -37,6 +37,8 @@ void CommandProcessor::help() {
         serialDevice.println("\tbootloader");
         serialDevice.println("\tstart_sampling");
         serialDevice.println("\tstop_sampling");
+        serialDevice.println("\thome");
+        serialDevice.println("\tseek_track <track>");
         serialDevice.println("\thelp\n");
     }
 }
@@ -50,6 +52,14 @@ void CommandProcessor::processCommand() {
         readSampler.startSampling();
     } else if ( command == "stop_sampling" ) {
         readSampler.stopSampling();
+    } else if ( command == "home" ) {
+        if ( readSampler.findTrack0() ){
+            serialDevice.println("Success! Head at track 0.\n");
+        } else {
+            serialDevice.println("ERROR: Unable to seek track 0.\n");
+        }
+    } else if ( command == "seek_track" ) { // parse int
+        readSampler.seekTrack(80);
     } else if ( command == "help" ) {
         help();
     }

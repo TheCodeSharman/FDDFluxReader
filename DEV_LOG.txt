@@ -90,3 +90,14 @@ Not sure what to do about that - maybe use a filter to filter out the interfence
 
 Oddly if I detach the wires BLUE and GREEN from the micro the interference stops.
 Maybe cross talk between the wires in the cable I'm using?
+
+7 May
+
+Realised I was trying to drive the ouputs at 3.3V when they should be 5V and also I wasn't
+converting the TTL input levels from 5V down to 3.3V. 
+
+The pins are supposed to be 5V tolerant and 3.3V should be considered a HIGH. But havoc was
+breaking lose in terms of signals crosstalk so decided to see if added some 4050 CMOS buffer 
+chips would isolate the signals and convert the levels. 
+
+It worked! The signal integrity issues I had previously are solved.

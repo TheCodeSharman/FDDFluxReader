@@ -18,8 +18,13 @@ class PinSampler {
             ERROR,
             IDLE
         };
-        
+
     private:
+        enum SeekDirection {
+            SEEK_OUT = HIGH,
+            SEEK_IN = LOW
+        };
+        
         BufferEncoder bufferEncoder;
         const int NUMBER_OF_SAMPLES_IN_BATCH = 42;
 
@@ -30,7 +35,7 @@ class PinSampler {
         
         MultiTask& multitask;
         USBSerial& output;
-        const uint32_t readPin, indexPin, stepPin, dirPin;
+        const uint32_t readPin, indexPin, stepPin, dirPin, track0Pin;
 
         uint32_t clockFrequency;
 
@@ -70,11 +75,23 @@ class PinSampler {
         void sendOutputBuffer(const int count);
         void checkForOverflow();
 
+        bool isAtTrack0();
+        void stepHead( SeekDirection dir);
+
+        uint8_t currentTrack = 0;
+        SeekDirection lastSeekDirection = SEEK_OUT;
+
     public:
-        PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin, const uint32_t stepPin, const uint32_t dirPin);
+        PinSampler(USBSerial& output, MultiTask& multitask, 
+            const uint32_t readPin, const uint32_t indexPin, 
+            const uint32_t stepPin, const uint32_t dirPin,
+            const uint32_t track0Pin);
         void init();
         void startSampling();
         void stopSampling();
+
+        int findTrack0(); // Home the head to track 0
+        void seekTrack(int track); // Seek specified track (note head needs to be homed first)
         State getState() { return currentState; };
 };
 

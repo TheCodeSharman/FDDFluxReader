@@ -9,9 +9,73 @@ extern "C" {
   }
 }
 
-PinSampler::PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin, const uint32_t stepPin, const uint32_t dirPin) 
-    : output(output), multitask(multitask), readPin(readPin), indexPin(indexPin), stepPin(stepPin), dirPin(dirPin),
+PinSampler::PinSampler(USBSerial& output, MultiTask& multitask, const uint32_t readPin, const uint32_t indexPin, 
+      const uint32_t stepPin, const uint32_t dirPin, const uint32_t track0Pin) 
+    : output(output), multitask(multitask), readPin(readPin), indexPin(indexPin), stepPin(stepPin), dirPin(dirPin), 
+      track0Pin(track0Pin),
       currentState(NOT_INITIALISED) {
+}
+
+// See seek timings here: https://deramp.com/downloads/floppy_drives/teac/TEAC%20FD-55GFR.pdf
+const uint32_t SEEK_PULSE_WIDTH_US = 1; // actually > 0.8uS
+const uint32_t SEEK_SAME_DIR_MS = 3;
+const uint32_t SEEK_CHANGE_DIR_MS = 10;
+
+void PinSampler::stepHead( SeekDirection dir) {
+  if ( dir != lastSeekDirection) {
+    digitalWrite(dirPin, dir);
+    delay(SEEK_CHANGE_DIR_MS);
+    lastSeekDirection= dir;
+  } else {
+    delay(SEEK_SAME_DIR_MS);
+  }
+  // Pulse STEP pin high
+  digitalWrite(stepPin, LOW);
+  delayMicroseconds(SEEK_PULSE_WIDTH_US);
+  digitalWrite(stepPin, HIGH);
+}
+
+const uint32_t READ_TRACK_0_MS = 3; // Actually > 2.8ms
+
+bool PinSampler::isAtTrack0() {
+  delay(READ_TRACK_0_MS);
+  return !digitalRead(track0Pin);
+}
+
+int PinSampler::findTrack0() {
+  int maxSteps = 100;
+  while( !isAtTrack0() && maxSteps-- > 0 ) {
+    stepHead(SEEK_OUT);
+  }
+ 
+  if ( isAtTrack0() ) {
+    currentTrack = 0;
+    return 1; // Success
+  } else {
+    return -1; // Error
+  }
+  
+}
+
+
+void PinSampler::seekTrack(int track) {
+  SeekDirection dir;
+  if (currentTrack == track ) return;
+
+  if ( currentTrack > track ) {
+    dir = SEEK_OUT;
+  } else {
+    dir = SEEK_IN;
+  }
+
+  while( currentTrack != track) {
+    stepHead(dir);
+    if ( dir == SEEK_OUT) 
+      currentTrack--;
+    else
+      currentTrack++;
+  }
+
 }
 
 void PinSampler::init() {
@@ -19,14 +83,17 @@ void PinSampler::init() {
   if ( currentState != NOT_INITIALISED )
     return;
 
-  // Configure step and dir pins
+  // Configure step, dir and track 0 pins
   pinMode(dirPin, OUTPUT);
-  digitalWrite(dirPin, HIGH);
+  digitalWrite(dirPin, SEEK_OUT);
+  lastSeekDirection = SEEK_OUT;
+
   pinMode(stepPin, OUTPUT);
   digitalWrite(stepPin, LOW);
+  pinMode(track0Pin, INPUT_PULLUP);
 
   // Configure index hole interrupt
-  pinMode(indexPin,INPUT);
+  pinMode(indexPin,INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(indexPin), std::bind(&PinSampler::indexHolePassing, this), FALLING);
   // PinName indexPinname = digitalPinToPinName(indexPin);
   // TIM_TypeDef *indexInstance = (TIM_TypeDef *)pinmap_peripheral(indexPinname, PinMap_TIM);
