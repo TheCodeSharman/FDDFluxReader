@@ -4,7 +4,7 @@ from sampler.scp_file import ScpFile, ScpFlag, ScpHeader, ScpHeads, ScpRevolutio
 from sampler.sample_decoder import SampleDecoder
 
 class FluxReader:
-    debug = True
+    debug = False
     START_SAMPLING = b'====== sampling started'
     END_SAMPLING = b'====== sampling stopped'
 
@@ -50,14 +50,21 @@ class FluxReader:
         self._expect(b"Success!")
         self._wait_for_prompt()
 
+    def _read_sample_line(self):
+        line = b''
+        while not line.endswith(b'\n'):
+            line += self._readline()
+        if self.debug: print(f"READ SAMPLE: {line}")
+        return line
+
     def read_track(self):
         decoder = SampleDecoder()
         self._exec(b"start_sampling")
         self._wait_for(self.START_SAMPLING)
-        line = self._readline()
+        line = self._read_sample_line()
         while not line.startswith(self.END_SAMPLING):
             decoder.processLine(line)
-            line = self._readline()
+            line = self._read_sample_line()
         return ScpTrack(
                 track_number = 0,
                 revolutions = [ ScpRevolution( 
