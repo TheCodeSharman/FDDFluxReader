@@ -1,4 +1,5 @@
 #include "CommandProcessor.h"
+#include <sstream>
 
 bool CommandProcessor::receive(char inChar) {
     if ( inChar == '\n' ) {
@@ -53,13 +54,21 @@ void CommandProcessor::processCommand() {
     } else if ( command == "stop_sampling" ) {
         readSampler.stopSampling();
     } else if ( command == "home" ) {
-        if ( readSampler.findTrack0() ){
+        if ( readSampler.findTrack0() == 1){
             serialDevice.println("Success! Head at track 0.\n");
         } else {
             serialDevice.println("ERROR: Unable to seek track 0.\n");
         }
-    } else if ( command == "seek_track" ) { // parse int
-        readSampler.seekTrack(80);
+    } else if ( command.rfind("seek_track",0) == 0) { 
+        std::stringstream stream(command);
+        int track;
+        stream.ignore(11);
+        stream >> track;
+        if ( readSampler.seekTrack(track) == 1) {
+            serialDevice.printf("Success! Head at track %i.\n\n", track);
+        } else {
+            serialDevice.printf("ERROR: Unable to seek track %i.\n\n", track);
+        }
     } else if ( command == "help" ) {
         help();
     }
@@ -85,7 +94,7 @@ void CommandProcessor::ready() {
 
 void CommandProcessor::unknownCommand() {
     if ( outputAllowed() ) {
-        serialDevice.printf("Unknown command: %s\r\n", command.c_str() );
+        serialDevice.printf("Unknown command: %s\n\n", command.c_str() );
     }
 }
 

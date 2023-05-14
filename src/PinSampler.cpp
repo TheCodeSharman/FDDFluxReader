@@ -58,9 +58,9 @@ int PinSampler::findTrack0() {
 }
 
 
-void PinSampler::seekTrack(int track) {
+int PinSampler::seekTrack(int track) {
   SeekDirection dir;
-  if (currentTrack == track ) return;
+  if (currentTrack == track ) return 1;
 
   if ( currentTrack > track ) {
     dir = SEEK_OUT;
@@ -75,7 +75,7 @@ void PinSampler::seekTrack(int track) {
     else
       currentTrack++;
   }
-
+  return 1;
 }
 
 void PinSampler::init() {

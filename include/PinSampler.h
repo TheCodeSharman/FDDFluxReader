@@ -91,7 +91,7 @@ class PinSampler {
         void stopSampling();
 
         int findTrack0(); // Home the head to track 0
-        void seekTrack(int track); // Seek specified track (note head needs to be homed first)
+        int seekTrack(int track); // Seek specified track (note head needs to be homed first)
         State getState() { return currentState; };
 };
 
